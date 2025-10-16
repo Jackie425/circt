@@ -9,6 +9,7 @@
 #include "ImportVerilogInternals.h"
 #include "slang/ast/Compilation.h"
 #include "slang/ast/SystemSubroutine.h"
+#include "slang/text/SourceManager.h"
 #include "llvm/ADT/ScopeExit.h"
 
 using namespace mlir;
@@ -381,6 +382,32 @@ struct StmtVisitor {
           return attr->name == "full_case";
         }) != caseStmtAttrs.end();
 
+    // Check for full_case in same-line comments (e.g., "casez (x) // synopsys full_case")
+    bool hasFullCaseComment = false;
+    auto sourceRange = caseStmt.sourceRange;
+    if (sourceRange.start().buffer()) {
+      auto sourceManager = context.compilation.getSourceManager();
+      auto bufferText = sourceManager->getSourceText(sourceRange.start().buffer());
+      
+      // Get the line containing the case keyword
+      auto startOffset = sourceRange.start().offset();
+      auto lineStart = startOffset;
+      
+      // Find start of line
+      while (lineStart > 0 && bufferText[lineStart - 1] != '\n')
+        lineStart--;
+      
+      // Find end of line
+      auto lineEnd = startOffset;
+      while (lineEnd < bufferText.size() && bufferText[lineEnd] != '\n')
+        lineEnd++;
+      
+      // Get the line text and look for "full_case"
+      auto lineText = bufferText.substr(lineStart, lineEnd - lineStart);
+      if (lineText.find("full_case") != std::string_view::npos)
+        hasFullCaseComment = true;
+    }
+
     // Check if the case statement looks exhaustive assuming two-state values.
     // We use this information to work around a common bug in input Verilog
     // where a case statement enumerates all possible two-state values of the
@@ -417,12 +444,13 @@ struct StmtVisitor {
     // will essentially make the last case item the "default".
     //
     // Alternatively, if the case statement has an (* full_case *) attribute
-    // but no default case, it indicates that the developer has intentionally
-    // covered all known possible values. Hence, the last match block is
-    // treated as the implicit "default" case.
-    if ((twoStateExhaustive || (hasFullCaseAttr && !caseStmt.defaultCase)) &&
+    // or a "// synopsys full_case" comment but no default case, it indicates
+    // that the developer has intentionally covered all known possible values.
+    // Hence, the last match block is treated as the implicit "default" case.
+    if ((twoStateExhaustive || ((hasFullCaseAttr || hasFullCaseComment) && !caseStmt.defaultCase)) &&
         lastMatchBlock &&
-        caseStmt.condition == CaseStatementCondition::Normal) {
+        (caseStmt.condition == CaseStatementCondition::Normal
+           || caseStmt.condition == CaseStatementCondition::WildcardJustZ)) {
       mlir::cf::BranchOp::create(builder, loc, lastMatchBlock);
     } else {
       // Generate the default case if present.
