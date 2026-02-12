@@ -68,9 +68,10 @@ cmake -G Ninja llvm/llvm -B build \
     -DLLVM_TARGETS_TO_BUILD=host \
     -DLLVM_ENABLE_PROJECTS=mlir \
     -DLLVM_EXTERNAL_PROJECTS=circt \
-    -DLLVM_EXTERNAL_CIRCT_SOURCE_DIR=$PWD \
-    -DLLVM_ENABLE_LLD=ON
+    -DCIRCT_SLANG_FRONTEND_ENABLED=ON \
+    -DLLVM_EXTERNAL_CIRCT_SOURCE_DIR=$PWD
 ```
+
 
 If you want to build everything about the CIRCT tools and libraries, run below command(also runs all tests):
 ```
@@ -87,6 +88,10 @@ or the `firtool` tool:
 ninja -C build bin/firtool
 ```
 
+The above builds the CIRCT tools and libraries and runs all regression tests.
+The configuration above enables the Slang frontend and includes `circt-verilog` in the build.
+If you do not want to build `circt-verilog`, remove `-DCIRCT_SLANG_FRONTEND_ENABLED=ON` from the cmake call.
+You can ask ninja to only build a specific library or tool, such as `ninja -C build circt-opt`.
 This will only build the necessary parts of LLVM, MLIR, and CIRCT, which can be a lot quicker than building everything.
 
 ### Dependencies
@@ -154,6 +159,7 @@ Then build and test *CIRCT*:
 cmake -G Ninja . -B build \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DLLVM_ENABLE_ASSERTIONS=ON \
+    -DCIRCT_SLANG_FRONTEND_ENABLED=ON \
     -DMLIR_DIR=$PWD/llvm/build/lib/cmake/mlir \
     -DLLVM_DIR=$PWD/llvm/build/lib/cmake/llvm
 ninja -C build
