@@ -491,20 +491,14 @@ void HWMemSimImpl::generateMemory(HWModuleOp op, FirMemory mem) {
   // disables randomization.
   if (!mem.initFilename.empty()) {
     auto emitInlineZeroInit = [&]() {
+      if (!reg.getInnerSymAttr())
+        reg.setInnerSymAttr(hw::InnerSymAttr::get(
+            b.getStringAttr(moduleNamespace.newName(reg.getName()))));
       sv::InitialOp::create(b, [&]() {
-        auto loopIndVarType = b.getIntegerType(llvm::Log2_64_Ceil(mem.depth + 1));
-        sv::ForOp::create(b, 0, mem.depth, 1, loopIndVarType, "i",
-                          [&](BlockArgument indVar) {
-                            Value iterValue = indVar;
-                            if (!indVar.getType().isInteger(
-                                    llvm::Log2_64_Ceil(mem.depth)))
-                              iterValue = b.createOrFold<comb::ExtractOp>(
-                                  iterValue, 0, llvm::Log2_64_Ceil(mem.depth));
-                            auto slot = sv::ArrayIndexInOutOp::create(b, reg, iterValue);
-                            auto zero = hw::ConstantOp::create(
-                                b, b.getIntegerType(mem.dataWidth), 0);
-                            sv::BPAssignOp::create(b, slot, zero);
-                          });
+        sv::VerbatimOp::create(
+            b, b.getStringAttr("{{0}} = '{default: '0};"), ValueRange{},
+            b.getArrayAttr(hw::InnerRefAttr::get(op.getNameAttr(),
+                                                 reg.getInnerNameAttr())));
       });
     };
 
