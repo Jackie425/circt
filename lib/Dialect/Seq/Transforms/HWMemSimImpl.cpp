@@ -43,6 +43,8 @@ namespace seq {
 
 namespace {
 
+static constexpr StringLiteral kZeroInitSentinel = "__ZERO_INIT__";
+
 class HWMemSimImpl {
   ReadEnableMode readEnableMode;
   bool addMuxPragmas;
@@ -183,6 +185,8 @@ Value HWMemSimImpl::addPipelineStages(ImplicitLocOpBuilder &b,
 
 void HWMemSimImpl::generateMemory(HWModuleOp op, FirMemory mem) {
   ImplicitLocOpBuilder b(op.getLoc(), op.getBody());
+  bool useZeroInitSentinel = mem.initFilename == kZeroInitSentinel;
+  bool skipMemRandomization = disableMemRandomization || useZeroInitSentinel;
 
   InnerSymbolNamespace moduleNamespace(op);
 
@@ -486,6 +490,27 @@ void HWMemSimImpl::generateMemory(HWModuleOp op, FirMemory mem) {
   // Add logic to initialize the memory based on a file emission request.  This
   // disables randomization.
   if (!mem.initFilename.empty()) {
+    auto emitInlineZeroInit = [&]() {
+      sv::InitialOp::create(b, [&]() {
+        auto loopIndVarType = b.getIntegerType(llvm::Log2_64_Ceil(mem.depth + 1));
+        sv::ForOp::create(b, 0, mem.depth, 1, loopIndVarType, "i",
+                          [&](BlockArgument indVar) {
+                            Value iterValue = indVar;
+                            if (!indVar.getType().isInteger(
+                                    llvm::Log2_64_Ceil(mem.depth)))
+                              iterValue = b.createOrFold<comb::ExtractOp>(
+                                  iterValue, 0, llvm::Log2_64_Ceil(mem.depth));
+                            auto slot = sv::ArrayIndexInOutOp::create(b, reg, iterValue);
+                            auto zero = hw::ConstantOp::create(
+                                b, b.getIntegerType(mem.dataWidth), 0);
+                            sv::BPAssignOp::create(b, slot, zero);
+                          });
+      });
+    };
+
+    if (useZeroInitSentinel) {
+      emitInlineZeroInit();
+    } else {
     // Set an inner symbol on the register if one does not exist.
     if (!reg.getInnerSymAttr())
       reg.setInnerSymAttr(hw::InnerSymAttr::get(
@@ -561,11 +586,12 @@ void HWMemSimImpl::generateMemory(HWModuleOp op, FirMemory mem) {
                                boundInstance.getInnerSymAttr().getSymName()));
       });
     }
+    }
   }
 
   // Add logic to initialize the memory and any internal registers to random
   // values.
-  if (disableMemRandomization && disableRegRandomization)
+  if (skipMemRandomization && disableRegRandomization)
     return;
 
   constexpr unsigned randomWidth = 32;
@@ -595,7 +621,7 @@ void HWMemSimImpl::generateMemory(HWModuleOp op, FirMemory mem) {
       sv::VerbatimOp::create(b, "`INIT_RANDOM_PROLOG_");
 
       // Memory randomization logic.  The entire memory is randomized.
-      if (!disableMemRandomization) {
+      if (!skipMemRandomization) {
         sv::IfDefProceduralOp::create(b, "RANDOMIZE_MEM_INIT", [&]() {
           auto outerLoopIndVarType =
               b.getIntegerType(llvm::Log2_64_Ceil(mem.depth + 1));
