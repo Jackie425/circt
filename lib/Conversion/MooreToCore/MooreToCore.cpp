@@ -35,6 +35,7 @@
 #include "mlir/Transforms/RegionUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/IR/DerivedTypes.h"
+#include <limits>
 
 namespace circt {
 #define GEN_PASS_DEF_CONVERTMOORETOCORE
@@ -1067,9 +1068,11 @@ struct ExtractOpConversion : public OpConversionPattern<ExtractOp> {
     Type inputType = adaptor.getInput().getType();
     int32_t low = adaptor.getLowBit();
 
-    if (isa<IntegerType>(inputType)) {
-      int32_t inputWidth = inputType.getIntOrFloatBitWidth();
+    auto lowerIntegerExtract = [&](Value input,
+                                   int32_t inputWidth) -> LogicalResult {
       int32_t resultWidth = hw::getBitWidth(resultType);
+      if (resultWidth < 0)
+        return failure();
       int32_t high = low + resultWidth;
 
       SmallVector<Value> toConcat;
@@ -1083,7 +1086,7 @@ struct ExtractOpConversion : public OpConversionPattern<ExtractOp> {
             op.getLoc(),
             rewriter.getIntegerType(
                 std::min(resultWidth, std::min(high, inputWidth) - lowIdx)),
-            adaptor.getInput(), lowIdx);
+            input, lowIdx);
         toConcat.push_back(middle);
       }
 
@@ -1098,6 +1101,21 @@ struct ExtractOpConversion : public OpConversionPattern<ExtractOp> {
           rewriter.createOrFold<comb::ConcatOp>(op.getLoc(), toConcat);
       rewriter.replaceOp(op, concat);
       return success();
+    };
+
+    if (isa<IntegerType>(inputType)) {
+      int32_t inputWidth = inputType.getIntOrFloatBitWidth();
+      return lowerIntegerExtract(adaptor.getInput(), inputWidth);
+    }
+
+    if (isa<hw::StructType, hw::UnionType>(inputType)) {
+      int64_t inputWidth = hw::getBitWidth(inputType);
+      if (inputWidth < 0 || inputWidth > std::numeric_limits<int32_t>::max())
+        return failure();
+      Value bits = rewriter.createOrFold<hw::BitcastOp>(
+          op.getLoc(), rewriter.getIntegerType(inputWidth),
+          adaptor.getInput());
+      return lowerIntegerExtract(bits, inputWidth);
     }
 
     if (auto arrTy = dyn_cast<hw::ArrayType>(inputType)) {

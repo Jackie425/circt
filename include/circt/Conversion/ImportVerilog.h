@@ -78,6 +78,9 @@ struct ImportVerilogOptions {
   /// A list of preprocessor directives to be ignored.
   std::vector<std::string> ignoreDirectives;
 
+  /// A list of comment directive formats for translate-off regions.
+  std::vector<std::string> translateOffOptions;
+
   //===--------------------------------------------------------------------===//
   // Preprocessing
   //===--------------------------------------------------------------------===//

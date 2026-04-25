@@ -2588,6 +2588,34 @@ OpFoldResult StructExtractOp::fold(FoldAdaptor adaptor) {
     return operandAttr.getValue()[getFieldIndex()];
   }
 
+  // Fold extracts from constants represented as bitcasts from packed integers.
+  // This commonly appears after lowering packed SystemVerilog parameters such
+  // as configuration structs.  Packed struct fields are laid out left-to-right,
+  // with the first field occupying the most-significant bits.
+  if (auto bitcast = getInput().getDefiningOp<hw::BitcastOp>()) {
+    auto intTy = dyn_cast<IntegerType>(getType());
+    if (!intTy)
+      return {};
+
+    auto bitcastInputOp = bitcast.getInput().getDefiningOp<hw::ConstantOp>();
+    if (!bitcastInputOp)
+      return {};
+
+    auto structType = type_cast<StructType>(getInput().getType());
+    uint64_t startIdx = 0;
+    auto elements = structType.getElements();
+    for (unsigned i = getFieldIndex() + 1, e = elements.size(); i < e; ++i) {
+      int64_t fieldWidth = hw::getBitWidth(elements[i].type);
+      if (fieldWidth < 0)
+        return {};
+      startIdx += fieldWidth;
+    }
+
+    auto bitcastInputCst = bitcastInputOp.getValue();
+    return IntegerAttr::get(intTy, bitcastInputCst.lshr(startIdx).trunc(
+                                       intTy.getIntOrFloatBitWidth()));
+  }
+
   if (auto foldResult =
           foldStructExtract(getInput().getDefiningOp(), getFieldIndex()))
     return foldResult;

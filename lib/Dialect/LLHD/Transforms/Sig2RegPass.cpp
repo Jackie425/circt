@@ -14,6 +14,7 @@
 #include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/LLHD/LLHDOps.h"
 #include "circt/Dialect/LLHD/LLHDPasses.h"
+#include "mlir/IR/Matchers.h"
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "llhd-sig2reg"
@@ -149,6 +150,89 @@ public:
 
                 return success();
               })
+              .Case<llhd::SigArraySliceOp>(
+                  [&](llhd::SigArraySliceOp sliceOp) {
+                    IntegerAttr indexAttr;
+                    if (!matchPattern(sliceOp.getLowIndex(),
+                                      m_Constant(&indexAttr)))
+                      return failure();
+
+                    auto elementWidth =
+                        hw::getBitWidth(sliceOp.getInputArrayType()
+                                            .getElementType());
+                    if (elementWidth <= 0)
+                      return failure();
+
+                    uint64_t arrayOffset =
+                        indexAttr.getValue().getZExtValue() * elementWidth;
+                    for (auto *user : sliceOp->getUsers())
+                      stack.emplace_back(
+                          user,
+                          Offset(offset.min + arrayOffset,
+                                 offset.max + arrayOffset, offset.dynamic));
+
+                    return success();
+                  })
+              .Case<llhd::SigArrayGetOp>([&](llhd::SigArrayGetOp getOp) {
+                IntegerAttr indexAttr;
+                if (!matchPattern(getOp.getIndex(), m_Constant(&indexAttr)))
+                  return failure();
+
+                auto arrayType = getOp.getArrayType();
+                auto elementWidth = hw::getBitWidth(arrayType.getElementType());
+                if (elementWidth <= 0)
+                  return failure();
+
+                auto index = indexAttr.getValue().getZExtValue();
+                if (index >= arrayType.getNumElements())
+                  return failure();
+
+                uint64_t arrayOffset = index * elementWidth;
+                for (auto *user : getOp->getUsers())
+                  stack.emplace_back(
+                      user, Offset(offset.min + arrayOffset,
+                                   offset.max + arrayOffset, offset.dynamic));
+
+                return success();
+              })
+              .Case<llhd::SigStructExtractOp>(
+                  [&](llhd::SigStructExtractOp extractOp) {
+                    auto inputType =
+                        cast<llhd::RefType>(extractOp.getInput().getType())
+                            .getNestedType();
+
+                    uint64_t fieldOffset = 0;
+                    if (auto structType = dyn_cast<hw::StructType>(inputType)) {
+                      auto fieldIndex =
+                          structType.getFieldIndex(extractOp.getField());
+                      if (!fieldIndex)
+                        return failure();
+
+                      auto elements = structType.getElements();
+                      for (unsigned i = *fieldIndex + 1, e = elements.size();
+                           i < e; ++i) {
+                        auto fieldWidth = hw::getBitWidth(elements[i].type);
+                        if (fieldWidth <= 0)
+                          return failure();
+                        fieldOffset += fieldWidth;
+                      }
+                    } else if (auto unionType =
+                                   dyn_cast<hw::UnionType>(inputType)) {
+                      if (!unionType.getFieldIndex(extractOp.getField()))
+                        return failure();
+                      fieldOffset = 0;
+                    } else {
+                      return failure();
+                    }
+
+                    for (auto *user : extractOp->getUsers())
+                      stack.emplace_back(
+                          user,
+                          Offset(offset.min + fieldOffset,
+                                 offset.max + fieldOffset, offset.dynamic));
+
+                    return success();
+                  })
               .Default([](auto *op) {
                 LLVM_DEBUG(llvm::dbgs() << "  - User that is not a probe or "
                                            "drive, skipping...\n    "

@@ -173,6 +173,13 @@ struct CLOptions {
       cl::desc("Exclude provided source files with these extensions"),
       cl::value_desc("ext"), cl::cat(cat)};
 
+  cl::list<std::string> translateOffOptions{
+      "translate-off-format",
+      cl::desc("Set comment directives that disable source text as "
+               "<common>,<start>,<end>, for example "
+               "pragma,translate_off,translate_on"),
+      cl::value_desc("<common>,<start>,<end>"), cl::cat(cat)};
+
   //===--------------------------------------------------------------------===//
   // Preprocessor
   //===--------------------------------------------------------------------===//
@@ -323,6 +330,7 @@ static LogicalResult executeWithSources(MLIRContext *context,
   options.libDirs = opts.libDirs;
   options.libExts = opts.libExts;
   options.excludeExts = opts.excludeExts;
+  options.translateOffOptions = opts.translateOffOptions;
 
   options.defines = opts.defines;
   options.undefines = opts.undefines;

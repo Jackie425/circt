@@ -228,6 +228,7 @@ LogicalResult ImportDriver::prepareDriver(SourceMgr &sourceMgr) {
   driver.options.excludeExts.insert(options.excludeExts.begin(),
                                     options.excludeExts.end());
   driver.options.ignoreDirectives = options.ignoreDirectives;
+  driver.options.translateOffOptions = options.translateOffOptions;
 
   driver.options.maxIncludeDepth = options.maxIncludeDepth;
   driver.options.defines = options.defines;

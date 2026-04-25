@@ -16,6 +16,7 @@ add_circt_library(CIRCTTransforms
   LINK_LIBS PUBLIC
   CIRCTComb
   CIRCTHW
+  CIRCTMoore
   CIRCTOpCountAnalysis
   MLIRArithDialect
   MLIRControlFlowDialect

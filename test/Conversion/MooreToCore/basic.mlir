@@ -359,6 +359,18 @@ func.func @DynExtractRefArrayElement(%j: !moore.ref<array<2 x array<1 x l3>>>, %
   return %0 : !moore.ref<array<1 x l3>>
 }
 
+// CHECK-LABEL: func @PackedAggregateExtract
+func.func @PackedAggregateExtract(%arg0: !moore.struct<{valid: l1, payload: l31}>, %arg1: !moore.union<{a: l16, b: l16}>) {
+  // CHECK: [[STRUCT_BITS:%.+]] = hw.bitcast %arg0 : (!hw.struct<valid: i1, payload: i31>) -> i32
+  // CHECK: comb.extract [[STRUCT_BITS]] from 8 : (i32) -> i16
+  moore.extract %arg0 from 8 : !moore.struct<{valid: l1, payload: l31}> -> !moore.l16
+
+  // CHECK: [[UNION_BITS:%.+]] = hw.bitcast %arg1 : (!hw.union<a: i16, b: i16>) -> i16
+  // CHECK: comb.extract [[UNION_BITS]] from 0 : (i16) -> i8
+  moore.extract %arg1 from 0 : !moore.union<{a: l16, b: l16}> -> !moore.l8
+  return
+}
+
 // CHECK-LABEL: func @AdvancedConversion
 func.func @AdvancedConversion(%arg0: !moore.array<5 x struct<{exp_bits: i32, man_bits: i32}>>) -> (!moore.array<5 x struct<{exp_bits: i32, man_bits: i32}>>, !moore.i320) {
   // CHECK: [[V0:%.+]] = hw.constant 3978585893941511189997889893581765703992223160870725712510875979948892565035285336817671 : i320

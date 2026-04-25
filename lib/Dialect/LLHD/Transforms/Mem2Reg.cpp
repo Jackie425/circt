@@ -593,7 +593,10 @@ static Value unpackProjections(OpBuilder &builder, Value value,
                       op.getLoc(), value, op.getIndex());
                 })
                 .Case<SigStructExtractOp>([&](auto op) {
-                  return builder.createOrFold<hw::StructExtractOp>(
+                  if (isa<hw::StructType>(value.getType()))
+                    return builder.createOrFold<hw::StructExtractOp>(
+                        op.getLoc(), value, op.getFieldAttr());
+                  return builder.createOrFold<hw::UnionExtractOp>(
                       op.getLoc(), value, op.getFieldAttr());
                 })
                 .Case<SigExtractOp>([&](auto op) {
@@ -627,8 +630,12 @@ static Value packProjections(OpBuilder &builder, Value value,
                       op.getLoc(), projection.into, op.getIndex(), value);
                 })
                 .Case<SigStructExtractOp>([&](auto op) {
-                  return builder.createOrFold<hw::StructInjectOp>(
-                      op.getLoc(), projection.into, op.getFieldAttr(), value);
+                  if (isa<hw::StructType>(projection.into.getType()))
+                    return builder.createOrFold<hw::StructInjectOp>(
+                        op.getLoc(), projection.into, op.getFieldAttr(), value);
+                  return builder.createOrFold<hw::UnionCreateOp>(
+                      op.getLoc(), projection.into.getType(),
+                      op.getFieldAttr(), value);
                 })
                 .Case<SigExtractOp>([&](auto op) {
                   return comb::createDynamicInject(builder, op.getLoc(),

@@ -13,6 +13,7 @@
 #include "circt/Dialect/Comb/CombOps.h"
 #include "circt/Dialect/HW/HWOpInterfaces.h"
 #include "circt/Dialect/HW/HWOps.h"
+#include "circt/Dialect/Moore/MooreTypes.h"
 #include "circt/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Pass/Pass.h"
@@ -35,6 +36,12 @@ public:
   MapArithTypeConverter() {
     addConversion([](Type type) {
       if (hw::isHWValueType(type))
+        return type;
+
+      // Some late-imported `arith.select` operations still carry Moore packed
+      // logic types (e.g. `!moore.l1`). `comb.mux` can represent these just
+      // fine, so keep the type legal for this pass.
+      if (isa<moore::PackedType>(type))
         return type;
 
       return Type();

@@ -192,8 +192,9 @@ void CFRemover::run() {
       sortedBlocks.push_back(ipoBlock);
     }
 
-    // Give up if there are any side-effecting ops in the region.
-    for (auto &op : block) {
+    // Give up if there are any side-effecting non-terminator ops in the
+    // region. Control-flow terminators themselves are expected here.
+    for (auto &op : block.without_terminator()) {
       if (!isMemoryEffectFree(&op)) {
         LLVM_DEBUG(llvm::dbgs() << "- Has side effects, giving up\n");
         return;

@@ -3399,16 +3399,35 @@ SubExprInfo ExprEmitter::visitTypeOp(StructInjectOp op) {
   // should be set to true.
   bool printAsPattern = isAssignmentLikeContext;
   StructType structType = op.getType();
+  SmallVector<std::pair<StringAttr, Value>, 4> replacements;
+  Value baseInput = op.getInput();
+
+  for (auto current = op;;) {
+    auto fieldName = current.getFieldNameAttr();
+    if (!llvm::any_of(replacements, [&](auto replacement) {
+          return replacement.first == fieldName;
+        }))
+      replacements.push_back({fieldName, current.getNewValue()});
+
+    baseInput = current.getInput();
+    auto next = baseInput.getDefiningOp<StructInjectOp>();
+    if (!next || next.getType() != op.getType())
+      break;
+    current = next;
+  }
+
   return printStructCreate(
       structType.getElements(),
       [&](const auto &field, auto index) {
-        if (field.name == op.getFieldNameAttr()) {
-          emitSubExpr(op.getNewValue(), Selection);
-        } else {
-          emitSubExpr(op.getInput(), Selection);
-          ps << "."
-             << PPExtString(emitter.getVerilogStructFieldName(field.name));
+        for (auto replacement : replacements) {
+          if (replacement.first == field.name) {
+            emitSubExpr(replacement.second, Selection);
+            return;
+          }
         }
+
+        emitSubExpr(baseInput, Selection);
+        ps << "." << PPExtString(emitter.getVerilogStructFieldName(field.name));
       },
       printAsPattern, op);
 }
