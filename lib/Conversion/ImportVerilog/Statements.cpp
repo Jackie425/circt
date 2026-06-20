@@ -10,6 +10,7 @@
 #include "slang/ast/Compilation.h"
 #include "slang/ast/SystemSubroutine.h"
 #include "slang/text/SourceManager.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 
 using namespace mlir;
@@ -18,6 +19,37 @@ using namespace ImportVerilog;
 
 // NOLINTBEGIN(misc-no-recursion)
 namespace {
+static bool isSourceControlStatement(const slang::ast::Statement &stmt);
+
+static bool containsAnySourceControl(const slang::ast::Statement &stmt) {
+  if (stmt.as_if<slang::ast::ConditionalStatement>() ||
+      stmt.as_if<slang::ast::CaseStatement>())
+    return true;
+  if (auto *block = stmt.as_if<slang::ast::BlockStatement>())
+    return containsAnySourceControl(block->body);
+  if (auto *list = stmt.as_if<slang::ast::StatementList>())
+    return llvm::any_of(list->list, [](const slang::ast::Statement *child) {
+      return containsAnySourceControl(*child);
+    });
+  return false;
+}
+
+static bool isSourceControlStatement(const slang::ast::Statement &stmt) {
+  return stmt.as_if<slang::ast::ConditionalStatement>() ||
+         stmt.as_if<slang::ast::CaseStatement>() ||
+         (stmt.as_if<slang::ast::BlockStatement>() &&
+          containsAnySourceControl(stmt));
+}
+
+struct SourceRegionScope {
+  Context &context;
+  unsigned previousRegionId;
+
+  SourceRegionScope(Context &context, unsigned regionId)
+      : context(context), previousRegionId(context.switchSourceRegion(regionId)) {}
+  ~SourceRegionScope() { context.switchSourceRegion(previousRegionId); }
+};
+
 struct StmtVisitor {
   Context &context;
   Location loc;
@@ -137,14 +169,39 @@ struct StmtVisitor {
   // which in turn has a single body statement, which then commonly is a list of
   // statements.
   LogicalResult visit(const slang::ast::StatementList &stmts) {
+    SmallVector<const slang::ast::Statement *> controls;
+    DenseMap<const slang::ast::Statement *, unsigned> childRegions;
+    if (context.isCollectingSourceRegions()) {
+      for (auto *stmt : stmts.list)
+        if (isSourceControlStatement(*stmt))
+          controls.push_back(stmt);
+
+      if (controls.size() >= 2) {
+        unsigned parentRegionId = context.currentSourceRegionId;
+        // The whole sequential list folds into one opaque node in the parent;
+        // each sibling control is encoded as a child region guarded by that node.
+        unsigned opaqueId = context.allocateSourceOpaque();
+        for (auto *stmt : controls)
+          childRegions[stmt] =
+              context.createSourceChildRegion(parentRegionId, opaqueId);
+      }
+    }
+
     for (auto *stmt : stmts.list) {
       if (isTerminated()) {
         auto loc = context.convertLocation(stmt->sourceRange);
         mlir::emitWarning(loc, "unreachable code");
         break;
       }
-      if (failed(context.convertStatement(*stmt)))
-        return failure();
+      auto childRegion = childRegions.find(stmt);
+      if (childRegion != childRegions.end()) {
+        SourceRegionScope scope(context, childRegion->second);
+        if (failed(context.convertStatement(*stmt)))
+          return failure();
+      } else {
+        if (failed(context.convertStatement(*stmt)))
+          return failure();
+      }
     }
     return success();
   }
@@ -274,8 +331,10 @@ struct StmtVisitor {
     Block &exitBlock = createBlock();
     Block *falseBlock = stmt.ifFalse ? &createBlock() : nullptr;
     Block &trueBlock = createBlock();
-    cf::CondBranchOp::create(builder, loc, allConds, &trueBlock,
-                             falseBlock ? falseBlock : &exitBlock);
+    auto branch = cf::CondBranchOp::create(builder, loc, allConds, &trueBlock,
+                                           falseBlock ? falseBlock
+                                                      : &exitBlock);
+    context.annotateSourceControl(branch);
 
     // Generate the true branch.
     builder.setInsertionPointToEnd(&trueBlock);
@@ -367,8 +426,9 @@ struct StmtVisitor {
         // If the condition matches, branch to the match block. Otherwise
         // continue checking the next expression in a new block.
         auto &nextBlock = createBlock();
-        mlir::cf::CondBranchOp::create(builder, itemLoc, cond, &matchBlock,
-                                       &nextBlock);
+        auto branch = mlir::cf::CondBranchOp::create(builder, itemLoc, cond,
+                                                     &matchBlock, &nextBlock);
+        context.annotateSourceControl(branch);
         builder.setInsertionPointToEnd(&nextBlock);
       }
 

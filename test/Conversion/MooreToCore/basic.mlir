@@ -528,6 +528,10 @@ moore.module @Variable() {
   // CHECK: %m = llhd.sig [[TMP]] : i19
   %m = moore.variable : <l19>
 
+  // CHECK: [[PCOV_INIT:%.+]] = hw.constant false
+  // CHECK: %pcov = llhd.sig [[PCOV_INIT]] {pcov.keep = "yes"} : i1
+  %pcov = moore.variable {pcov.keep = "yes"} : <i1>
+
   // CHECK: [[TMP2:%.+]] = hw.constant 10 : i32
   %3 = moore.constant 10 : i32
 

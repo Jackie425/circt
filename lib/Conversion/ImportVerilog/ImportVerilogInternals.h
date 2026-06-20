@@ -83,6 +83,16 @@ struct HierPathInfo {
   const slang::ast::ValueSymbol *valueSym;
 };
 
+/// Source-structured PCOV path encoding region metadata collected while
+/// lowering a single procedure.
+struct SourceRegionInfo {
+  unsigned id = 0;
+  std::optional<unsigned> parentRegionId;
+  std::optional<unsigned> parentOpaqueId;
+  unsigned nextControlId = 0;
+  unsigned nextOpaqueId = 0;
+};
+
 /// A helper class to facilitate the conversion from a Slang AST to MLIR
 /// operations. Keeps track of the destination MLIR module, builders, and
 /// various worklists and utilities needed for conversion.
@@ -140,6 +150,28 @@ struct Context {
   Value getImplicitThisRef() const {
     return currentThisRef; // block arg added in declareFunction
   }
+  /// Start collecting source-structured PCOV region metadata for a procedure.
+  void beginSourceRegionProcedure(moore::ProcedureOp procOp);
+  /// Attach collected source-structured PCOV region metadata to the procedure.
+  void finalizeSourceRegionProcedure();
+  /// Drop active source-structured PCOV region metadata without attaching it.
+  void discardSourceRegionProcedure();
+  /// Temporarily disable procedure source region collection.
+  void suspendSourceRegionCollection();
+  /// Re-enable procedure source region collection after a suspension.
+  void resumeSourceRegionCollection();
+  /// Return whether source region collection is active for this statement.
+  bool isCollectingSourceRegions() const;
+  /// Annotate a lowered control-flow branch as belonging to the active region.
+  void annotateSourceControl(Operation *op);
+  /// Allocate an opaque node in the active source region.
+  unsigned allocateSourceOpaque();
+  /// Create a child source region for a folded opaque node.
+  unsigned createSourceChildRegion(unsigned parentRegionId,
+                                   unsigned parentOpaqueId);
+  /// Switch the active source region and return the previous region ID.
+  unsigned switchSourceRegion(unsigned regionId);
+
   // Convert a statement AST node to MLIR ops.
   LogicalResult convertStatement(const slang::ast::Statement &stmt);
 
@@ -339,6 +371,14 @@ struct Context {
   /// Variable to track the value of the current function's implicit `this`
   /// reference
   Value currentThisRef = {};
+
+  /// Active procedure source region metadata. Empty outside a procedure.
+  moore::ProcedureOp currentSourceRegionProcedure = {};
+  SmallVector<SourceRegionInfo> sourceRegions;
+  unsigned currentSourceRegionId = 0;
+  unsigned nextSourceRegionId = 0;
+  unsigned sourceRegionSuspendDepth = 0;
+  bool hasSourceRegionControl = false;
 
 private:
   /// Helper function to extract the commonalities in lowering of functions and

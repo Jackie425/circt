@@ -893,8 +893,15 @@ struct VariableOpConversion : public OpConversionPattern<VariableOp> {
         return failure();
     }
 
-    rewriter.replaceOpWithNewOp<llhd::SignalOp>(op, resultType,
-                                                op.getNameAttr(), init);
+    SmallVector<NamedAttribute> pcovAttrs;
+    for (NamedAttribute attr : op->getAttrs())
+      if (attr.getName().getValue().starts_with("pcov."))
+        pcovAttrs.push_back(attr);
+
+    auto signal = rewriter.replaceOpWithNewOp<llhd::SignalOp>(
+        op, resultType, op.getNameAttr(), init);
+    for (NamedAttribute attr : pcovAttrs)
+      signal->setAttr(attr.getName(), attr.getValue());
     return success();
   }
 };

@@ -60,3 +60,38 @@ endmodule
 
 function void foo();
 endfunction
+
+// CHECK-LABEL: moore.module @SourceRegionNoControl()
+module SourceRegionNoControl;
+  logic a, b;
+  // CHECK: moore.procedure initial {
+  // CHECK-NOT: pcov.src.regions
+  // CHECK: moore.return
+  initial b = a;
+endmodule
+
+// CHECK-LABEL: moore.module @SourceRegionIfControl()
+module SourceRegionIfControl;
+  logic a, b;
+  // CHECK: moore.procedure initial attributes {pcov.src.regions =
+  // CHECK: cf.cond_br {{.*}} {pcov.src.control_id = 0 : i32, pcov.src.region_id = 0 : i32}
+  initial if (a) b = 1; else b = 0;
+endmodule
+
+// CHECK-LABEL: moore.module @SourceRegionFunctionOnly()
+module SourceRegionFunctionOnly;
+  logic a, b;
+  // CHECK: moore.procedure initial {
+  // CHECK-NOT: pcov.src.regions
+  // CHECK: func.call @source_region_function_only
+  // CHECK-NEXT: moore.blocking_assign
+  // CHECK-NEXT: moore.return
+  initial b = source_region_function_only(a);
+endmodule
+
+function logic source_region_function_only(logic a);
+  if (a)
+    source_region_function_only = 1;
+  else
+    source_region_function_only = 0;
+endfunction

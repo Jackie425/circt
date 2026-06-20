@@ -9,6 +9,7 @@
 #include "ImportVerilogInternals.h"
 #include "slang/ast/Compilation.h"
 #include "slang/ast/symbols/ClassSymbols.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 
 using namespace circt;
@@ -27,6 +28,109 @@ static void guessNamespacePrefix(const slang::ast::Symbol &symbol,
     prefix += symbol.name;
     prefix += "::";
   }
+}
+
+void Context::beginSourceRegionProcedure(moore::ProcedureOp procOp) {
+  currentSourceRegionProcedure = procOp;
+  sourceRegions.clear();
+  sourceRegions.push_back({0, std::nullopt, std::nullopt});
+  currentSourceRegionId = 0;
+  nextSourceRegionId = 1;
+  sourceRegionSuspendDepth = 0;
+  hasSourceRegionControl = false;
+}
+
+void Context::finalizeSourceRegionProcedure() {
+  if (!currentSourceRegionProcedure)
+    return;
+
+  if (hasSourceRegionControl) {
+    SmallVector<Attribute> regionAttrs;
+    regionAttrs.reserve(sourceRegions.size());
+    auto *ctx = getContext();
+    for (const auto &region : sourceRegions) {
+      SmallVector<NamedAttribute> attrs;
+      attrs.push_back(
+          builder.getNamedAttr("id", builder.getI32IntegerAttr(region.id)));
+      if (region.parentRegionId)
+        attrs.push_back(builder.getNamedAttr(
+            "parent_region_id",
+            builder.getI32IntegerAttr(*region.parentRegionId)));
+      if (region.parentOpaqueId)
+        attrs.push_back(builder.getNamedAttr(
+            "parent_opaque_id",
+            builder.getI32IntegerAttr(*region.parentOpaqueId)));
+      regionAttrs.push_back(DictionaryAttr::get(ctx, attrs));
+    }
+    currentSourceRegionProcedure->setAttr("pcov.src.regions",
+                                          builder.getArrayAttr(regionAttrs));
+  }
+
+  currentSourceRegionProcedure = {};
+  sourceRegions.clear();
+  currentSourceRegionId = 0;
+  nextSourceRegionId = 0;
+  sourceRegionSuspendDepth = 0;
+  hasSourceRegionControl = false;
+}
+
+void Context::discardSourceRegionProcedure() {
+  currentSourceRegionProcedure = {};
+  sourceRegions.clear();
+  currentSourceRegionId = 0;
+  nextSourceRegionId = 0;
+  sourceRegionSuspendDepth = 0;
+  hasSourceRegionControl = false;
+}
+
+void Context::suspendSourceRegionCollection() { ++sourceRegionSuspendDepth; }
+
+void Context::resumeSourceRegionCollection() {
+  assert(sourceRegionSuspendDepth && "source region collection not suspended");
+  --sourceRegionSuspendDepth;
+}
+
+bool Context::isCollectingSourceRegions() const {
+  return currentSourceRegionProcedure && sourceRegionSuspendDepth == 0;
+}
+
+void Context::annotateSourceControl(Operation *op) {
+  if (!isCollectingSourceRegions() || !op)
+    return;
+  auto region = llvm::find_if(sourceRegions, [&](const SourceRegionInfo &info) {
+    return info.id == currentSourceRegionId;
+  });
+  if (region == sourceRegions.end())
+    return;
+  op->setAttr("pcov.src.region_id",
+              builder.getI32IntegerAttr(currentSourceRegionId));
+  op->setAttr("pcov.src.control_id",
+              builder.getI32IntegerAttr(region->nextControlId++));
+  if (region->parentOpaqueId)
+    op->setAttr("pcov.src.opaque_id",
+                builder.getI32IntegerAttr(*region->parentOpaqueId));
+  hasSourceRegionControl = true;
+}
+
+unsigned Context::allocateSourceOpaque() {
+  auto region = llvm::find_if(sourceRegions, [&](const SourceRegionInfo &info) {
+    return info.id == currentSourceRegionId;
+  });
+  assert(region != sourceRegions.end() && "unknown current source region");
+  return region->nextOpaqueId++;
+}
+
+unsigned Context::createSourceChildRegion(unsigned parentRegionId,
+                                          unsigned parentOpaqueId) {
+  unsigned id = nextSourceRegionId++;
+  sourceRegions.push_back({id, parentRegionId, parentOpaqueId});
+  return id;
+}
+
+unsigned Context::switchSourceRegion(unsigned regionId) {
+  unsigned previous = currentSourceRegionId;
+  currentSourceRegionId = regionId;
+  return previous;
 }
 
 //===----------------------------------------------------------------------===//
@@ -561,10 +665,18 @@ struct ModuleVisitor : public BaseVisitor {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointToEnd(&procOp.getBody().emplaceBlock());
     Context::ValueSymbolScope scope(context.valueSymbols);
+    context.beginSourceRegionProcedure(procOp);
+    bool sourceRegionsFinalized = false;
+    llvm::scope_exit sourceRegionGuard([&] {
+      if (!sourceRegionsFinalized)
+        context.discardSourceRegionProcedure();
+    });
     if (failed(context.convertStatement(body)))
       return failure();
     if (builder.getBlock())
       moore::ReturnOp::create(builder, loc);
+    context.finalizeSourceRegionProcedure();
+    sourceRegionsFinalized = true;
     return success();
   }
 
@@ -1275,6 +1387,9 @@ Context::convertFunction(const slang::ast::SubroutineSymbol &subroutine) {
   // Convert the body of the function.
   OpBuilder::InsertionGuard g(builder);
   builder.setInsertionPointToEnd(&block);
+  suspendSourceRegionCollection();
+  llvm::scope_exit sourceRegionGuard(
+      [&] { resumeSourceRegionCollection(); });
 
   Value returnVar;
   if (subroutine.returnValVar) {
