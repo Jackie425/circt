@@ -457,6 +457,48 @@ hw.module @ClockAndResetSameConst(in %clock: i1, in %reset: i1) {
   llhd.drv %3, %1 after %0 if %2 : i42
 }
 
+// CHECK-LABEL: @ClockAndResetSameConstWithEnable(
+hw.module @ClockAndResetSameConstWithEnable(in %clock: i1, in %reset: i1, in %en: i1) {
+  %c0_i2 = hw.constant 0 : i2
+  %0 = llhd.constant_time <0ns, 1d, 0e>
+  // CHECK-NOT: llhd.process
+  // CHECK: [[CLK:%.+]] = seq.to_clock %clock
+  // CHECK: [[MUX:%.+]] = comb.mux bin {{%.+}}, %c1_i2, [[REG:%.+]] : i2
+  // CHECK: [[REG]] = seq.firreg [[MUX]] clock [[CLK]] reset async %reset, %c1_i2 : i2
+  %1, %2 = llhd.process -> i2, i1 {
+    %true = hw.constant true
+    %false = hw.constant false
+    %c0_i2_0 = hw.constant 0 : i2
+    %c1_i2 = hw.constant 1 : i2
+    cf.br ^bb1(%clock, %reset, %c0_i2_0, %false : i1, i1, i2, i1)
+  ^bb1(%3: i1, %4: i1, %5: i2, %6: i1):
+    llhd.wait yield (%5, %6 : i2, i1), (%clock, %reset : i1, i1), ^bb2(%3, %4 : i1, i1)
+  ^bb2(%7: i1, %8: i1):
+    %9 = comb.xor bin %7, %true : i1
+    %10 = comb.and bin %9, %clock : i1  // posedge clock
+    %11 = comb.xor bin %8, %true : i1
+    %12 = comb.and bin %11, %reset : i1  // posedge reset
+    %13 = comb.or bin %10, %12 : i1
+    cf.cond_br %13, ^bb3, ^bb1(%clock, %reset, %c0_i2_0, %false : i1, i1, i2, i1)
+  ^bb3:
+    cf.cond_br %reset, ^bb4(%c0_i2_0 : i2), ^bb5(%c1_i2 : i2)
+  ^bb4(%14: i2):
+    cf.br ^bb8(%14 : i2)
+  ^bb5(%15: i2):
+    %16 = comb.add %15, %c1_i2 : i2
+    cf.cond_br %en, ^bb6(%15 : i2), ^bb7(%16 : i2)
+  ^bb6(%17: i2):
+    cf.br ^bb8(%17 : i2)
+  ^bb7(%18: i2):
+    cf.br ^bb8(%18 : i2)
+  ^bb8(%19: i2):
+    cf.br ^bb1(%clock, %reset, %c1_i2, %true : i1, i1, i2, i1)
+  }
+  %3 = llhd.sig %c0_i2 : i2
+  // CHECK: llhd.drv {{%.+}}, [[REG]] after {{%.+}} :
+  llhd.drv %3, %1 after %0 if %2 : i2
+}
+
 // CHECK-LABEL: @ClockAndResetDifferentConst(
 hw.module @ClockAndResetDifferentConst(in %clock: i1, in %reset: i1) {
   %c0_i42 = hw.constant 0 : i42

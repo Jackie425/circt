@@ -5303,7 +5303,8 @@ LogicalResult StmtEmitter::visitSV(AlwaysOp op) {
   startStatement();
 
   auto printEvent = [&](AlwaysOp::Condition cond) {
-    ps << PPExtString(stringifyEventControl(cond.event)) << PP::nbsp;
+    if (cond.event != sv::EventControl::AtChange)
+      ps << PPExtString(stringifyEventControl(cond.event)) << PP::nbsp;
     ps.scopedBox(PP::cbox0, [&]() { emitExpression(cond.value, ops); });
   };
   ps.addCallback({op, true});

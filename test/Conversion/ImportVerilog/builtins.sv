@@ -379,7 +379,7 @@ module SampleValueBuiltins #() (
 );
   // CHECK: [[CLKWIRE:%.+]] = moore.net name "clk_i" wire : <l1>
   // CHECK: [[DATAWIRE:%.+]] = moore.net name "data_i" wire : <l8>
-  // CHECK: moore.procedure always {
+  // CHECK: moore.procedure always{{.*}}{
   // CHECK-NEXT: [[C:%.+]] = moore.read [[CLKWIRE]] : <l1>
   // CHECK-NEXT: [[C_INT:%.+]] = moore.logic_to_int [[C]] : l1
   // CHECK-NEXT: [[CB:%.+]] = moore.to_builtin_int [[C_INT]] : i1
@@ -391,7 +391,7 @@ module SampleValueBuiltins #() (
   // CHECK-NEXT: [[NOTPAST:%.+]] = comb.xor [[PAST]], [[TRUE]] : i1
   // CHECK-NEXT: [[NOTPASTANDCURRENT:%.+]] = ltl.and [[CURRENT]], [[NOTPAST]] : i1, i1
   rising_clk: assert property (@(posedge clk_i) clk_i |=> $rose(clk_i));
-  // CHECK: moore.procedure always {
+  // CHECK: moore.procedure always{{.*}}{
   // CHECK-NEXT: [[C:%.+]] = moore.read [[CLKWIRE]] : <l1>
   // CHECK-NEXT: [[C_INT:%.+]] = moore.logic_to_int [[C]] : l1
   // CHECK-NEXT: [[CB:%.+]] = moore.to_builtin_int [[C_INT]] : i1
@@ -402,7 +402,7 @@ module SampleValueBuiltins #() (
   // CHECK-NEXT: [[NOTCURRENT:%.+]] = ltl.not [[CURRENT]] : i1
   // CHECK-NEXT: [[PASTANDNOTCURRENT:%.+]] = ltl.and [[NOTCURRENT]], [[PAST]] : !ltl.property, i1
   falling_clk: assert property (@(posedge clk_i) clk_i |=> $fell(clk_i));
-  // CHECK: moore.procedure always {
+  // CHECK: moore.procedure always{{.*}}{
   // CHECK-NEXT: [[C:%.+]] = moore.read [[CLKWIRE]] : <l1>
   // CHECK-NEXT: [[C_INT:%.+]] = moore.logic_to_int [[C]] : l1
   // CHECK-NEXT: [[CB:%.+]] = moore.to_builtin_int [[C_INT]] : i1
@@ -416,7 +416,7 @@ module SampleValueBuiltins #() (
   // CHECK-NEXT: [[NOTPASTANDNOTCURRENT:%.+]] = ltl.and [[NOTCURRENT]], [[NOTPAST]] : !ltl.property, !ltl.property
   // CHECK-NEXT: [[STABLE:%.+]] = ltl.or [[PASTANDCURRENT]], [[NOTPASTANDNOTCURRENT]] : i1, !ltl.property
   stable_clk: assert property (@(posedge clk_i) clk_i |=> $stable(clk_i));
-  // CHECK: moore.procedure always {
+  // CHECK: moore.procedure always{{.*}}{
   // CHECK-NEXT: [[C:%.+]] = moore.read [[CLKWIRE]] : <l1>
   // CHECK-NEXT: [[C_INT:%.+]] = moore.logic_to_int [[C]] : l1
   // CHECK-NEXT: [[CB:%.+]] = moore.to_builtin_int [[C_INT]] : i1
@@ -426,7 +426,7 @@ module SampleValueBuiltins #() (
   // CHECK-NEXT: [[PAST:%.+]] = ltl.past [[CURRENT]], 1 : i1
   // CHECK-NEXT: [[STABLE:%.+]] = comb.icmp ne [[PAST]], [[CURRENT]] : i1
   changed_clk: assert property (@(posedge clk_i) clk_i |=> $changed(clk_i));
-  // CHECK: moore.procedure always {
+  // CHECK: moore.procedure always{{.*}}{
   // CHECK-NEXT: [[C:%.+]] = moore.read [[CLKWIRE]] : <l1>
   // CHECK-NEXT: [[C_INT:%.+]] = moore.logic_to_int [[C]] : l1
   // CHECK-NEXT: [[CB:%.+]] = moore.to_builtin_int [[C_INT]] : i1
@@ -436,7 +436,7 @@ module SampleValueBuiltins #() (
   // CHECK-NEXT: [[PAST:%.+]] = ltl.past [[CURRENT]], 1 : i1
   past_clk: assert property (@(posedge clk_i) clk_i |=> $past(clk_i));
   // Check that the output of past can be used by non-LTL ops
-  // CHECK: moore.procedure always {
+  // CHECK: moore.procedure always{{.*}}{
   // CHECK-NEXT: [[C1:%.+]] = moore.read [[CLKWIRE]] : <l1>
   // CHECK-NEXT: [[C2:%.+]] = moore.read [[CLKWIRE]] : <l1>
   // CHECK-NEXT: [[C2_INT:%.+]] = moore.logic_to_int [[C2]] : l1
@@ -447,7 +447,7 @@ module SampleValueBuiltins #() (
   // CHECK-NEXT: [[EQ:%.+]] = moore.eq [[C1]], [[PAST_LOGIC]] : l1 -> l1
   past_eq: assert property (@(posedge clk_i) clk_i == $past(clk_i));
   // Test $past on wider bitvectors
-  // CHECK: moore.procedure always {
+  // CHECK: moore.procedure always{{.*}}{
   // CHECK-NEXT: [[D1:%.+]] = moore.read [[DATAWIRE]] : <l8>
   // CHECK-NEXT: [[D2:%.+]] = moore.read [[DATAWIRE]] : <l8>
   // CHECK-NEXT: [[D2_INT:%.+]] = moore.logic_to_int [[D2]] : l8

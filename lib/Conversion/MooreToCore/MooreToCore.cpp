@@ -381,6 +381,12 @@ static void getValuesToObserve(Region *region,
 struct ProcedureOpConversion : public OpConversionPattern<ProcedureOp> {
   using OpConversionPattern::OpConversionPattern;
 
+  static void copyPcovAttributes(Operation *from, Operation *to) {
+    for (NamedAttribute attr : from->getAttrs())
+      if (attr.getName().getValue().starts_with("pcov."))
+        to->setAttr(attr.getName(), attr.getValue());
+  }
+
   LogicalResult
   matchAndRewrite(ProcedureOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -408,6 +414,7 @@ struct ProcedureOpConversion : public OpConversionPattern<ProcedureOp> {
         newOp = llhd::ProcessOp::create(rewriter, loc, TypeRange{});
       else
         newOp = llhd::FinalOp::create(rewriter, loc);
+      copyPcovAttributes(op, newOp);
       auto &body = newOp->getRegion(0);
       rewriter.inlineRegionBefore(op.getBody(), body, body.end());
       for (auto returnOp :
@@ -421,6 +428,7 @@ struct ProcedureOpConversion : public OpConversionPattern<ProcedureOp> {
 
     // All other procedures lower to a an `llhd.process`.
     auto newOp = llhd::ProcessOp::create(rewriter, loc, TypeRange{});
+    copyPcovAttributes(op, newOp);
 
     // We need to add an empty entry block because it is not allowed in MLIR to
     // branch back to the entry block. Instead we put the logic in the second

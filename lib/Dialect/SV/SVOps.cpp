@@ -664,12 +664,20 @@ void AlwaysOp::build(OpBuilder &builder, OperationState &result,
 LogicalResult AlwaysOp::verify() {
   if (getEvents().size() != getNumOperands())
     return emitError("different number of operands and events");
+  for (auto [index, eventAttr] : llvm::enumerate(getEvents())) {
+    auto event = sv::EventControl(cast<IntegerAttr>(eventAttr).getInt());
+    if (event == sv::EventControl::AtChange)
+      continue;
+    if (!getOperand(index).getType().isInteger(1))
+      return emitError("edge-sensitive event operands must be i1");
+  }
   return success();
 }
 
 static ParseResult parseEventList(
     OpAsmParser &p, Attribute &eventsAttr,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &clocksOperands) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &clocksOperands,
+    SmallVectorImpl<Type> &clockTypes) {
 
   // Parse zero or more conditions intoevents and clocksOperands.
   SmallVector<Attribute> events;
@@ -680,13 +688,24 @@ static ParseResult parseEventList(
     while (1) {
       auto kind = sv::symbolizeEventControl(keyword);
       if (!kind.has_value())
-        return p.emitError(loc, "expected 'posedge', 'negedge', or 'edge'");
+        return p.emitError(loc,
+                           "expected 'posedge', 'negedge', 'edge', or "
+                           "'change'");
       auto eventEnum = static_cast<int32_t>(*kind);
       events.push_back(p.getBuilder().getI32IntegerAttr(eventEnum));
 
       clocksOperands.push_back({});
       if (p.parseOperand(clocksOperands.back()))
         return failure();
+      if (*kind == sv::EventControl::AtChange &&
+          succeeded(p.parseOptionalColon())) {
+        Type type;
+        if (p.parseType(type))
+          return failure();
+        clockTypes.push_back(type);
+      } else {
+        clockTypes.push_back(p.getBuilder().getI1Type());
+      }
 
       if (failed(p.parseOptionalComma()))
         break;
@@ -699,7 +718,7 @@ static ParseResult parseEventList(
 }
 
 static void printEventList(OpAsmPrinter &p, AlwaysOp op, ArrayAttr portsAttr,
-                           OperandRange operands) {
+                           OperandRange operands, TypeRange types) {
   for (size_t i = 0, e = op.getNumConditions(); i != e; ++i) {
     if (i != 0)
       p << ", ";
@@ -707,6 +726,9 @@ static void printEventList(OpAsmPrinter &p, AlwaysOp op, ArrayAttr portsAttr,
     p << stringifyEventControl(cond.event);
     p << ' ';
     p.printOperand(cond.value);
+    if (cond.event == sv::EventControl::AtChange &&
+        !cond.value.getType().isInteger(1))
+      p << " : " << cond.value.getType();
   }
 }
 
@@ -763,6 +785,18 @@ void AlwaysFFOp::build(OpBuilder &builder, OperationState &result,
 
   if (resetCtor)
     resetCtor();
+}
+
+LogicalResult AlwaysFFOp::verify() {
+  if (getClockEdge() == EventControl::AtChange)
+    return emitError(
+        "sv.alwaysff clock and reset events cannot be change-sensitive");
+
+  if (getResetEdge() && *getResetEdge() == EventControl::AtChange)
+    return emitError(
+        "sv.alwaysff clock and reset events cannot be change-sensitive");
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -2816,30 +2850,53 @@ FuncDPIImportOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 // Assert Property Like ops
 //===----------------------------------------------------------------------===//
 
+namespace ConcurrentVerifLikeOp {
+static LogicalResult verify(EventControl event, mlir::Location loc) {
+  if (event == EventControl::AtChange)
+    return mlir::emitError(
+        loc, "concurrent verification event cannot be change-sensitive");
+  return success();
+}
+} // namespace ConcurrentVerifLikeOp
+
+LogicalResult AssertConcurrentOp::verify() {
+  return ConcurrentVerifLikeOp::verify(getEvent(), getLoc());
+}
+
+LogicalResult AssumeConcurrentOp::verify() {
+  return ConcurrentVerifLikeOp::verify(getEvent(), getLoc());
+}
+
+LogicalResult CoverConcurrentOp::verify() {
+  return ConcurrentVerifLikeOp::verify(getEvent(), getLoc());
+}
+
 namespace AssertPropertyLikeOp {
 // Check that a clock is never given without an event
 // and that an event is never given with a clock.
-static LogicalResult verify(Value clock, bool eventExists, mlir::Location loc) {
+static LogicalResult verify(Value clock, std::optional<EventControl> event,
+                            mlir::Location loc) {
+  bool eventExists = event.has_value();
   if ((!clock && eventExists) || (clock && !eventExists))
     return mlir::emitError(
         loc, "Every clock must be associated to an even and vice-versa!");
+  if (event && *event == EventControl::AtChange)
+    return mlir::emitError(
+        loc, "property verification event cannot be change-sensitive");
   return success();
 }
 } // namespace AssertPropertyLikeOp
 
 LogicalResult AssertPropertyOp::verify() {
-  return AssertPropertyLikeOp::verify(getClock(), getEvent().has_value(),
-                                      getLoc());
+  return AssertPropertyLikeOp::verify(getClock(), getEvent(), getLoc());
 }
 
 LogicalResult AssumePropertyOp::verify() {
-  return AssertPropertyLikeOp::verify(getClock(), getEvent().has_value(),
-                                      getLoc());
+  return AssertPropertyLikeOp::verify(getClock(), getEvent(), getLoc());
 }
 
 LogicalResult CoverPropertyOp::verify() {
-  return AssertPropertyLikeOp::verify(getClock(), getEvent().has_value(),
-                                      getLoc());
+  return AssertPropertyLikeOp::verify(getClock(), getEvent(), getLoc());
 }
 
 //===----------------------------------------------------------------------===//

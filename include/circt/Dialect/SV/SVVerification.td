@@ -139,6 +139,7 @@ def AssertConcurrentOp : ConcurrentVerifOp<"assert.concurrent"> {
     and to test that the design behaves as expected.  See section 16.5 of the
     SystemVerilog 2017 specification.
   }];
+  let hasVerifier = true;
 }
 
 def AssumeConcurrentOp : ConcurrentVerifOp<"assume.concurrent"> {
@@ -149,6 +150,7 @@ def AssumeConcurrentOp : ConcurrentVerifOp<"assume.concurrent"> {
     to test that the design behaves as expected.  See section 16.5 of the
     SystemVerilog 2017 specification.
   }];
+  let hasVerifier = true;
 }
 
 def CoverConcurrentOp : ConcurrentVerifOp<"cover.concurrent",
@@ -159,6 +161,7 @@ def CoverConcurrentOp : ConcurrentVerifOp<"cover.concurrent",
     simulation will watch if it occurrs and how many times it occurs.  See
     section 16.5 of the SystemVerilog 2017 specification.
   }];
+  let hasVerifier = true;
 }
 
 

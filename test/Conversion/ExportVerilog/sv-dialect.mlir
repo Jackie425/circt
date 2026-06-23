@@ -77,6 +77,11 @@ hw.module @M1<param1: i42>(in %clock : i1, in %cond : i1, in %val : i8) {
   sv.always edge %clock {
   }
 
+  // CHECK-NEXT: always @(val) begin
+  // CHECK-NEXT: end // always @(change)
+  sv.always change %val : i8 {
+  }
+
   // CHECK-NEXT: always @* begin
   // CHECK-NEXT: end // always
   sv.always {

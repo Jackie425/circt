@@ -154,7 +154,7 @@ endmodule
 
 // CHECK-LABEL: moore.module @testModule3() {
 // CHECK: [[T:%.*]] = moore.variable : <class<@"testModule3::testModuleClass">>
-// CHECK: moore.procedure initial {
+// CHECK: moore.procedure initial{{.*}}{
 // CHECK:   [[NEW:%.*]] = moore.class.new : <@"testModule3::testModuleClass">
 // CHECK:   moore.blocking_assign [[T]], [[NEW]] : class<@"testModule3::testModuleClass">
 // CHECK:   moore.return
@@ -175,7 +175,7 @@ endmodule
 // CHECK-LABEL: moore.module @testModule4() {
 // CHECK: [[T:%.*]] = moore.variable : <class<@"testModule4::testModuleClass">>
 // CHECK: [[RESULT:%.+]] = moore.variable : <i32>
-// CHECK: moore.procedure initial {
+// CHECK: moore.procedure initial{{.*}}{
 // CHECK:    [[NEW:%.*]] = moore.class.new : <@"testModule4::testModuleClass">
 // CHECK:    moore.blocking_assign [[T]], [[NEW]] : class<@"testModule4::testModuleClass">
 // CHECK:    [[CLASSHANDLE:%.+]] = moore.read [[T]] : <class<@"testModule4::testModuleClass">>
@@ -208,7 +208,7 @@ endmodule
 // CHECK-LABEL: moore.module @testModule5() {
 // CHECK: [[T:%.*]] = moore.variable : <class<@"testModule5::testModuleClass">>
 // CHECK: [[RESULT:%.+]] = moore.variable : <i32>
-// CHECK: moore.procedure initial {
+// CHECK: moore.procedure initial{{.*}}{
 // CHECK:    [[NEW:%.*]] = moore.class.new : <@"testModule5::testModuleClass">
 // CHECK:    moore.blocking_assign [[T]], [[NEW]] : class<@"testModule5::testModuleClass">
 // CHECK:    [[CLASSHANDLE:%.+]] = moore.read [[T]] : <class<@"testModule5::testModuleClass">>
@@ -241,7 +241,7 @@ endmodule
 // CHECK-LABEL: moore.module @testModule6() {
 // CHECK: [[T:%.*]] = moore.variable : <class<@"testModule6::testModuleClass2">>
 // CHECK: [[RESULT:%.+]] = moore.variable : <i32>
-// CHECK: moore.procedure initial {
+// CHECK: moore.procedure initial{{.*}}{
 // CHECK:    [[NEW:%.*]] = moore.class.new : <@"testModule6::testModuleClass2">
 // CHECK:    moore.blocking_assign [[T]], [[NEW]] : class<@"testModule6::testModuleClass2">
 // CHECK:    [[CLASSHANDLE:%.+]] = moore.read [[T]] : <class<@"testModule6::testModuleClass2">>
@@ -277,7 +277,7 @@ endmodule
 // CHECK-LABEL: moore.module @testModule7() {
 // CHECK: [[T:%.*]] = moore.variable : <class<@"testModule7::testModuleClass">>
 // CHECK: [[RESULT:%.+]] = moore.variable : <i32>
-// CHECK: moore.procedure initial {
+// CHECK: moore.procedure initial{{.*}}{
 // CHECK:    [[NEW:%.*]] = moore.class.new : <@"testModule7::testModuleClass">
 // CHECK:    moore.blocking_assign [[T]], [[NEW]] : class<@"testModule7::testModuleClass">
 // CHECK:    [[CALLREAD:%.+]] = moore.read [[T]] : <class<@"testModule7::testModuleClass">>
@@ -321,7 +321,7 @@ endmodule
  // CHECK-LABEL: moore.module @testModule8() {
  // CHECK:    [[t:%.+]] = moore.variable : <class<@"testModule8::testModuleClass2">>
  // CHECK:    [[result:%.+]] = moore.variable : <i32>
- // CHECK:    moore.procedure initial {
+ // CHECK:    moore.procedure initial{{.*}}{
  // CHECK:      [[NEW:%.+]] = moore.class.new : <@"testModule8::testModuleClass2">
  // CHECK:      moore.blocking_assign [[t]], [[NEW]] : class<@"testModule8::testModuleClass2">
 // CHECK:    [[CALLREAD:%.+]] = moore.read [[t]] : <class<@"testModule8::testModuleClass2">>
@@ -369,7 +369,7 @@ endmodule
 // CHECK-LABEL: moore.module @testModule9() {
 // CHECK: [[t:%.+]] = moore.variable : <class<@"testModule9::testModuleClass2">>
 // CHECK: [[result:%.+]] = moore.variable : <i32>
-// CHECK: moore.procedure initial {
+// CHECK: moore.procedure initial{{.*}}{
 // CHECK:   [[new_obj:%.+]] = moore.class.new : <@"testModule9::testModuleClass2">
 // CHECK:   moore.blocking_assign [[t]], [[new_obj]] : class<@"testModule9::testModuleClass2">
 // CHECK:    [[CALLREAD:%.+]] = moore.read [[t]] : <class<@"testModule9::testModuleClass2">>
@@ -438,7 +438,7 @@ endfunction
 /// Check that calls to new by classes with ctor call the ctor.
 
 // CHECK-LABEL:  moore.module @testModule10() {
-// CHECK:    moore.procedure initial {
+// CHECK:    moore.procedure initial{{.*}}{
 // CHECK:      [[NEW:%.+]] = moore.class.new : <@"testModule10::testModuleClass">
 // CHECK:      [[CONST:%.+]] = moore.constant 3 : i32
 // CHECK:      func.call @"testModule10::testModuleClass::new"([[NEW]], [[CONST]]) : (!moore.class<@"testModule10::testModuleClass">, !moore.i32) -> ()

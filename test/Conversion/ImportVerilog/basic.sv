@@ -2371,7 +2371,7 @@ endmodule
 module ImmediateAssertiWithActionBlock;
   logic x;
   int a;
-// CHECK: moore.procedure always {
+// CHECK: moore.procedure always{{.*}}{
   // CHECK: [[READ_X:%.+]] = moore.read %x : <l1>
   // CHECK: [[X_INT:%.+]] = moore.logic_to_int [[READ_X]] : l1
   // CHECK: [[CONV_X:%.+]] = moore.to_builtin_int [[X_INT]] : i1
@@ -2385,7 +2385,7 @@ module ImmediateAssertiWithActionBlock;
 // CHECK: }
   assert (x) a = 1;
 
-// CHECK: moore.procedure always {
+// CHECK: moore.procedure always{{.*}}{
   // CHECK: [[READ_X:%.+]] = moore.read %x : <l1>
   // CHECK: [[X_INT:%.+]] = moore.logic_to_int [[READ_X]] : l1
   // CHECK: [[CONV_X:%.+]] = moore.to_builtin_int [[X_INT]] : i1
@@ -2401,7 +2401,7 @@ module ImmediateAssertiWithActionBlock;
 // CHECK: }
   assert (x) else a = 0;
 
-// CHECK: moore.procedure always {
+// CHECK: moore.procedure always{{.*}}{
   // CHECK: [[READ_X:%.+]] = moore.read %x : <l1>
   // CHECK: [[X_INT:%.+]] = moore.logic_to_int [[READ_X]] : l1
   // CHECK: [[CONV_X:%.+]] = moore.to_builtin_int [[X_INT]] : i1
@@ -2672,7 +2672,7 @@ module ConcurrentAssert(input clk);
   assert property (@(posedge clk) a);
 
   // Sequence declaration
-  // CHECK-NOT: moore.procedure always {
+  // CHECK-NOT: moore.procedure always{{.*}}{
   // CHECK: [[TMP:%.+]] = moore.read %a : <i1>
   // CHECK: [[A:%.+]] = moore.to_builtin_int [[TMP]] : i1
   // CHECK: [[DA:%.+]] = ltl.delay [[A]], 0, 0 : i1
@@ -2687,7 +2687,7 @@ module ConcurrentAssert(input clk);
   endsequence
   assert property (s1);
 
-  // CHECK-NOT: moore.procedure always {
+  // CHECK-NOT: moore.procedure always{{.*}}{
   // CHECK: [[TMP:%.+]] = moore.read %b : <l1>
   // CHECK: [[TMP_INT:%.+]] = moore.logic_to_int [[TMP]] : l1
   // CHECK: [[B:%.+]] = moore.to_builtin_int [[TMP_INT]] : i1
@@ -2705,7 +2705,7 @@ module ConcurrentAssert(input clk);
   endsequence
   assert property (s2(b, a));
 
-  // CHECK-NOT: moore.procedure always {
+  // CHECK-NOT: moore.procedure always{{.*}}{
   // CHECK: [[TMP:%.+]] = moore.read %a : <i1>
   // CHECK: [[A:%.+]] = moore.to_builtin_int [[TMP]] : i1
   // CHECK: [[DA:%.+]] = ltl.delay [[A]], 0, 0 : i1
@@ -2724,7 +2724,7 @@ module ConcurrentAssert(input clk);
   endproperty
   assert property (p1);
 
-  // CHECK-NOT: moore.procedure always {
+  // CHECK-NOT: moore.procedure always{{.*}}{
   // CHECK: [[TMP:%.+]] = moore.read %a : <i1>
   // CHECK: [[A1:%.+]] = moore.to_builtin_int [[TMP]] : i1
   // CHECK: [[TMP:%.+]] = moore.read %a : <i1>
@@ -2766,7 +2766,7 @@ module ConcurrentAssert(input clk);
   endproperty
   assert property (p2(a, s2(a, b)));
 
-  // CHECK-NOT: moore.procedure always {
+  // CHECK-NOT: moore.procedure always{{.*}}{
   // CHECK: [[READ_B:%.+]] = moore.read %b : <l1>
   // CHECK: [[ENABLE:%.+]] = moore.not [[READ_B]]
   // CHECK: [[CONV_1_ENABLE:%.+]] = moore.logic_to_int [[ENABLE]] : l1
@@ -2776,7 +2776,7 @@ module ConcurrentAssert(input clk);
   // CHECK: verif.assert [[CONV_A]] if [[CONV_2_ENABLE]] : i1
   assert property (disable iff (b) a);
 
-  // CHECK-NOT: moore.procedure always {
+  // CHECK-NOT: moore.procedure always{{.*}}{
   // CHECK: [[READ_A:%.+]] = moore.read %a : <i1>
   // CHECK: [[ENABLE:%.+]] = moore.not [[READ_A]]
   // CHECK: [[ENABLE_CONV:%.+]] = moore.to_builtin_int [[ENABLE]] : i1
@@ -2786,7 +2786,7 @@ module ConcurrentAssert(input clk);
   // CHECK: verif.assert [[CONV_2_B]] if [[ENABLE_CONV]] : i1
   assert property (disable iff (a) b);
 
-  // CHECK-NOT: moore.procedure always {
+  // CHECK-NOT: moore.procedure always{{.*}}{
   // CHECK: [[READ_A:%.+]] = moore.read %a : <i1>
   // CHECK: [[ENABLE:%.+]] = moore.not [[READ_A]]
   // CHECK: [[ENABLE_CONV:%.+]] = moore.to_builtin_int [[ENABLE]] : i1
@@ -3841,12 +3841,12 @@ endprogram
 module Events;
   // CHECK: [[EVENT:%.+]] = moore.variable : <i1>
   event e;
-  // CHECK: moore.procedure initial {
+  // CHECK: moore.procedure initial{{.*}}{
   // CHECK-NEXT: [[TMP1:%.+]] = moore.read [[EVENT]]
   // CHECK-NEXT: [[TMP2:%.+]] = moore.not [[TMP1]]
   // CHECK-NEXT: moore.blocking_assign [[EVENT]], [[TMP2]]
   initial ->e;
-  // CHECK: moore.procedure initial {
+  // CHECK: moore.procedure initial{{.*}}{
   // CHECK-NEXT: moore.wait_event {
   // CHECK-NEXT:   [[TMP1:%.+]] = moore.read [[EVENT]]
   // CHECK-NEXT:   moore.detect_event any [[TMP1]]
@@ -3883,7 +3883,7 @@ endmodule
 // CHECK-LABEL: moore.module @QueueSizeTest() {
 // CHECK:    [[Q:%.+]] = moore.variable : <queue<i32, 0>>
 // CHECK:    [[QSIZE:%.+]] = moore.variable : <i32>
-// CHECK:    moore.procedure initial {
+// CHECK:    moore.procedure initial{{.*}}{
 // CHECK:      [[QVAR:%.+]] = moore.read [[Q]] : <queue<i32, 0>>
 // CHECK:      [[SIZE:%.+]] = moore.builtin.size [[QVAR]] : <i32, 0>
 // CHECK:      moore.blocking_assign [[QSIZE]], [[SIZE]] : i32
@@ -3957,7 +3957,7 @@ endmodule
 // CHECK-LABEL: moore.module @QueueManipulationTest() {
 // CHECK:    [[Q:%.+]] = moore.variable : <queue<i32, 0>>
 // CHECK:    [[QSIZE:%.+]] = moore.variable : <i32>
-// CHECK:    moore.procedure initial {
+// CHECK:    moore.procedure initial{{.*}}{
 // CHECK:      [[QR:%.+]] = moore.read [[Q]] : <queue<i32, 0>>
 // CHECK:      [[QSIZER:%.+]] = moore.read [[QSIZE]] : <i32>
 // CHECK:      moore.push_back [[QSIZER]] into [[QR]] : <i32, 0>
@@ -3999,7 +3999,7 @@ endmodule
 // CHECK-LABEL: moore.module @QueueExtractTest() {
 // CHECK:           [[Q:%.+]] = moore.variable : <queue<l32, 0>>
 // CHECK:           [[QE:%.+]] = moore.variable : <l32>
-// CHECK:           moore.procedure initial {
+// CHECK:           moore.procedure initial{{.*}}{
 // CHECK:             [[QR:%.+]] = moore.read [[Q]] : <queue<l32, 0>>
 // CHECK:             [[C0A:%.+]] = moore.constant 0 : i32
 // CHECK:             [[E0:%.+]] = moore.dyn_queue_extract [[QR]] from [[C0A]] : <l32, 0>, i32 -> l32

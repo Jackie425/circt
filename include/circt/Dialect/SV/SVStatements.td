@@ -199,9 +199,11 @@ def AtPosEdge: I32EnumAttrCase<"AtPosEdge", 0, "posedge">;
 def AtNegEdge: I32EnumAttrCase<"AtNegEdge", 1, "negedge">;
 /// AtEdge(v) is syntactic sugar for "AtPosEdge(v) or AtNegEdge(v)".
 def AtEdge   : I32EnumAttrCase<"AtEdge", 2, "edge">;
+/// AtChange triggers whenever the expression changes value.
+def AtChange : I32EnumAttrCase<"AtChange", 3, "change">;
 
 def EventControlAttr : I32EnumAttr<"EventControl", "edge control trigger",
-                                   [AtPosEdge, AtNegEdge, AtEdge]> {
+                                   [AtPosEdge, AtNegEdge, AtEdge, AtChange]> {
   let cppNamespace = "circt::sv";
 }
 
@@ -214,10 +216,11 @@ def AlwaysOp : SVOp<"always", [SingleBlock, NoTerminator, NoRegionArguments,
 
   let regions = (region SizedRegion<1>:$body);
   let arguments = (ins TypedArrayAttrBase<EventControlAttr, "events">:$events,
-                       Variadic<I1>:$clocks);
+                       Variadic<AnyType>:$clocks);
   let results = (outs);
 
-  let assemblyFormat = "custom<EventList>($events, $clocks) $body attr-dict";
+  let assemblyFormat =
+      "custom<EventList>($events, $clocks, type($clocks)) $body attr-dict";
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -295,6 +298,8 @@ def AlwaysFFOp : SVOp<"alwaysff", [SingleBlock, NoTerminator, NoRegionArguments,
                        OptionalAttr<EventControlAttr>:$resetEdge,
                        Optional<I1>:$reset);
   let results = (outs);
+
+  let hasVerifier = 1;
 
   let assemblyFormat = [{
     `(` $clockEdge $clock `)` $bodyBlk

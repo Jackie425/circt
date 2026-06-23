@@ -932,6 +932,8 @@ bool Deseq::matchDriveClockAndReset(
     auto clockWhileReset = DNFTerm{clockEdge | resetOn};
     auto clockWithoutEnable = DNFTerm{clockEdge | resetOff};
     auto clockWithEnable = DNFTerm{clockEdge | resetOff | 0b01};
+    auto clockWithoutEnableResetAgnostic = DNFTerm{clockEdge};
+    auto clockWithEnableResetAgnostic = DNFTerm{clockEdge | 0b01};
 
     // Find the entries corresponding to the above conditions.
     auto resetIt = llvm::find_if(
@@ -947,8 +949,16 @@ bool Deseq::matchDriveClockAndReset(
     auto clockIt = llvm::find_if(valueTable, [&](auto &pair) {
       return pair.first == clockWithoutEnable || pair.first == clockWithEnable;
     });
-    if (clockIt == valueTable.end())
-      continue;
+    bool clockTermMayOverlapReset = false;
+    if (clockIt == valueTable.end()) {
+      clockIt = llvm::find_if(valueTable, [&](auto &pair) {
+        return pair.first == clockWithoutEnableResetAgnostic ||
+               pair.first == clockWithEnableResetAgnostic;
+      });
+      if (clockIt == valueTable.end())
+        continue;
+      clockTermMayOverlapReset = true;
+    }
 
     // Ensure that `/rst` and `/clk&rst` set the register to the same reset
     // value. Otherwise the reset doesn't have clear precedence over the
@@ -958,6 +968,13 @@ bool Deseq::matchDriveClockAndReset(
       LLVM_DEBUG(llvm::dbgs() << "- Aborting: inconsistent reset value\n");
       return false;
     }
+    // If the clock term was minimized without an explicit reset-off term, it
+    // overlaps with the reset-active clock edge. This is only safe if the clock
+    // value is the reset value as well, since the generated register will give
+    // reset precedence over the clock.
+    if (clockTermMayOverlapReset &&
+        (clockIt->second != resetIt->second || clockIt->second.isUnknown()))
+      continue;
 
     // Populate the reset and clock info, and return.
     drive.reset.reset = triggers[resetIdx];
@@ -966,7 +983,8 @@ bool Deseq::matchDriveClockAndReset(
 
     drive.clock.clock = triggers[clockIdx];
     drive.clock.risingEdge = !negClock;
-    if (clockIt->first == clockWithEnable)
+    if (clockIt->first == clockWithEnable ||
+        clockIt->first == clockWithEnableResetAgnostic)
       drive.clock.enable = drive.op.getEnable();
     drive.clock.value = drive.op.getValue();
     if (!clockIt->second.isUnknown())

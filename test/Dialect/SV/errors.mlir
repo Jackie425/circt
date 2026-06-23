@@ -176,6 +176,27 @@ hw.module @AlwaysFF(in %arg0: i1) {
 }
 
 // -----
+hw.module @AlwaysFFRejectChange(in %clk: i1) {
+  // expected-error @+1 {{sv.alwaysff clock and reset events cannot be change-sensitive}}
+  sv.alwaysff(change %clk) {}
+}
+
+// -----
+
+hw.module @ConcurrentAssertRejectChange(in %clk: i1, in %cond: i1) {
+  // expected-error @+1 {{concurrent verification event cannot be change-sensitive}}
+  sv.assert.concurrent change %clk, %cond
+}
+
+// -----
+
+hw.module @PropertyAssertRejectChange(in %clk: i1, in %cond: i1) {
+  // expected-error @+1 {{property verification event cannot be change-sensitive}}
+  sv.assert_property %cond on change %clk : i1
+}
+
+// -----
+
 hw.module @Wire() {
   sv.initial {
     // expected-error @+1 {{sv.wire should be in a non-procedural region}}

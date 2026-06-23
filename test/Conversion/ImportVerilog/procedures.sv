@@ -7,37 +7,37 @@
 
 // CHECK-LABEL: moore.module @Foo()
 module Foo;
-  // CHECK:      moore.procedure initial {
+  // CHECK:      moore.procedure initial attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK-NEXT:   func.call @foo
   // CHECK-NEXT:   moore.return
   // CHECK-NEXT: }
   initial foo();
 
-  // CHECK:      moore.procedure final {
+  // CHECK:      moore.procedure final attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK-NEXT:   func.call @foo
   // CHECK-NEXT:   moore.return
   // CHECK-NEXT: }
   final foo();
 
-  // CHECK:      moore.procedure always {
+  // CHECK:      moore.procedure always attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK-NEXT:   func.call @foo
   // CHECK-NEXT:   moore.return
   // CHECK-NEXT: }
   always foo();
 
-  // CHECK:      moore.procedure always_comb {
+  // CHECK:      moore.procedure always_comb attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK-NEXT:   func.call @foo
   // CHECK-NEXT:   moore.return
   // CHECK-NEXT: }
   always_comb foo();
 
-  // CHECK:      moore.procedure always_latch {
+  // CHECK:      moore.procedure always_latch attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK-NEXT:   func.call @foo
   // CHECK-NEXT:   moore.return
   // CHECK-NEXT: }
   always_latch foo();
 
-  // CHECK:      moore.procedure always_ff {
+  // CHECK:      moore.procedure always_ff attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK-NEXT:   moore.wait_event {
   // CHECK-NEXT:   }
   // CHECK-NEXT:   func.call @foo
@@ -45,13 +45,13 @@ module Foo;
   // CHECK-NEXT: }
   always_ff @* foo();
 
-  // CHECK-STAR:      moore.procedure always {
+  // CHECK-STAR:      moore.procedure always attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK-STAR-NEXT:   moore.wait_event {
   // CHECK-STAR-NEXT:   }
   // CHECK-STAR-NEXT:   func.call @foo
   // CHECK-STAR-NEXT:   moore.return
   // CHECK-STAR-NEXT: }
-  // CHECK-COMB:      moore.procedure always_comb {
+  // CHECK-COMB:      moore.procedure always_comb attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK-COMB-NEXT:   func.call @foo
   // CHECK-COMB-NEXT:   moore.return
   // CHECK-COMB-NEXT: }
@@ -64,8 +64,7 @@ endfunction
 // CHECK-LABEL: moore.module @SourceRegionNoControl()
 module SourceRegionNoControl;
   logic a, b;
-  // CHECK: moore.procedure initial {
-  // CHECK-NOT: pcov.src.regions
+  // CHECK: moore.procedure initial attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK: moore.return
   initial b = a;
 endmodule
@@ -81,8 +80,7 @@ endmodule
 // CHECK-LABEL: moore.module @SourceRegionFunctionOnly()
 module SourceRegionFunctionOnly;
   logic a, b;
-  // CHECK: moore.procedure initial {
-  // CHECK-NOT: pcov.src.regions
+  // CHECK: moore.procedure initial attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK: func.call @source_region_function_only
   // CHECK-NEXT: moore.blocking_assign
   // CHECK-NEXT: moore.return

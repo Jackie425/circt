@@ -58,6 +58,12 @@ hw.module @test1(in %arg0: i1, in %arg1: i1, in %arg8: i8) {
   // CHECK-NEXT:   }
   // CHECK-NEXT: }
 
+  sv.always change %arg8 : i8 {
+  }
+
+  // CHECK-NEXT: sv.always change %arg8 : i8 {
+  // CHECK-NEXT: }
+
   sv.alwaysff(posedge %arg0) {
     sv.fwrite %fd, "Yo\n"
   }

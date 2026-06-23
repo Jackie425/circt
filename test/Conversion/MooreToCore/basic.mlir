@@ -811,6 +811,15 @@ moore.module @Procedures() {
     moore.return
   }
 
+  // CHECK: llhd.process attributes {pcov.src.regions = [{id = 0 : i32, point_count = 1 : i64}]} {
+  // CHECK:   func.call @dummyA()
+  // CHECK:   llhd.halt
+  // CHECK: }
+  moore.procedure initial attributes {pcov.src.regions = [{id = 0 : i32, point_count = 1 : i64}]} {
+    func.call @dummyA() : () -> ()
+    moore.return
+  }
+
   // CHECK: llhd.process {
   // CHECK:   cf.br ^[[BB:.+]]
   // CHECK: ^[[BB]]:

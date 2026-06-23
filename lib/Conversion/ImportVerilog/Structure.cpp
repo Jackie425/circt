@@ -44,7 +44,8 @@ void Context::finalizeSourceRegionProcedure() {
   if (!currentSourceRegionProcedure)
     return;
 
-  if (hasSourceRegionControl) {
+  bool hasRootOnlyRegion = sourceRegions.size() == 1;
+  if (hasSourceRegionControl || hasRootOnlyRegion) {
     SmallVector<Attribute> regionAttrs;
     regionAttrs.reserve(sourceRegions.size());
     auto *ctx = getContext();
