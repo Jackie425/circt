@@ -46,8 +46,24 @@ endmodule
 module BranchConditional(input logic s, input logic a, input logic b, output logic y);
   // CHECK: moore.conditional
   // CHECK-SAME: pcov.src.branch_alternatives = [{id = 0 : i32, name = "true"}, {id = 1 : i32, name = "false"}]
+  // CHECK-SAME: pcov.src.branch_id = 0
   // CHECK-SAME: pcov.src.branch_kind = "conditional"
   // CHECK-SAME: pcov.src.false_alternative_id = 1
   // CHECK-SAME: pcov.src.true_alternative_id = 0
   assign y = s ? a : b;
+endmodule
+
+// CHECK-LABEL: moore.module @BranchConditionalIds
+// CHECK-DAG: pcov.src.branch_id = 0
+// CHECK-DAG: pcov.src.branch_id = 1
+// CHECK-DAG: pcov.src.branch_id = 2
+module BranchConditionalIds(input logic s, input logic a, input logic b,
+                            output logic y, output logic z, output logic w);
+  assign y = s ? a : b;
+
+  always_comb begin
+    if (s) z = a; else z = b;
+  end
+
+  assign w = s ? b : a;
 endmodule

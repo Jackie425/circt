@@ -262,6 +262,12 @@ static void copyPcovSourceAttrs(Operation *from, Operation *to) {
       to->setAttr(attr.getName(), attr.getValue());
 }
 
+static bool hasPcovSourceAttrs(Operation *op) {
+  return llvm::any_of(op->getAttrs(), [](NamedAttribute attr) {
+    return attr.getName().getValue().starts_with("pcov.src.");
+  });
+}
+
 static bool hasPcovCoverageAttrs(Operation *op) {
   return llvm::any_of(op->getAttrs(), [](NamedAttribute attr) {
     return attr.getName().getValue().starts_with("pcov.coverage.");
@@ -317,11 +323,14 @@ LogicalResult VariableOp::canonicalize(VariableOp op,
   // If the original variable had a name, create an `AssignedVariableOp` as a
   // replacement. Otherwise substitute the assigned value directly.
   Value assignedValue = uniqueAssignOp.getSrc();
-  if (auto name = op.getNameAttr(); name && !name.empty()) {
+  auto name = op.getNameAttr();
+  if (name && !name.empty()) {
     auto assignedVar = AssignedVariableOp::create(rewriter, op.getLoc(), name,
                                                   uniqueAssignOp.getSrc());
     copyPcovSourceAttrs(uniqueAssignOp, assignedVar);
     assignedValue = assignedVar;
+  } else if (hasPcovSourceAttrs(uniqueAssignOp)) {
+    return failure();
   }
 
   // Remove the assign op and replace all reads with the new assigned var op.
@@ -473,6 +482,9 @@ LogicalResult NetOp::canonicalize(NetOp op, PatternRewriter &rewriter) {
   // If there was one unique assignment, and the `NetOp` does not yet have an
   // assigned value set, fold the assignment into the net.
   if (uniqueAssignOp && !op.getAssignment()) {
+    auto name = op.getNameAttr();
+    if (hasPcovSourceAttrs(uniqueAssignOp) && (!name || name.empty()))
+      return failure();
     rewriter.modifyOpInPlace(
         op, [&] {
           op.getAssignmentMutable().assign(uniqueAssignOp.getSrc());
@@ -490,11 +502,14 @@ LogicalResult NetOp::canonicalize(NetOp op, PatternRewriter &rewriter) {
     // If the original net had a name, create an `AssignedVariableOp` as a
     // replacement. Otherwise substitute the assigned value directly.
     auto assignedValue = op.getAssignment();
-    if (auto name = op.getNameAttr(); name && !name.empty()) {
+    auto name = op.getNameAttr();
+    if (name && !name.empty()) {
       auto assignedVar =
           AssignedVariableOp::create(rewriter, op.getLoc(), name, assignedValue);
       copyPcovSourceAttrs(op, assignedVar);
       assignedValue = assignedVar;
+    } else if (hasPcovSourceAttrs(op)) {
+      return success(modified);
     }
 
     // Replace all reads with the new assigned var op and remove the original

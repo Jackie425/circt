@@ -271,6 +271,28 @@ moore.module @PreserveSourceStatementAttrs(in %u: !moore.i42) {
   dbg.variable "a", %0 : !moore.i42
 }
 
+// CHECK-LABEL: moore.module @PreserveUnnamedSourceStatementVar
+moore.module @PreserveUnnamedSourceStatementVar(in %u: !moore.i42) {
+  // CHECK: moore.assign %[[VAR:.+]], %u {pcov.src.statement_id = 0 : i32, pcov.src.statement_kind = "continuous_assign"} : i42
+  // CHECK: %[[VAR]] = moore.variable
+  // CHECK: moore.read %[[VAR]]
+  moore.assign %0, %u {pcov.src.statement_id = 0 : i32, pcov.src.statement_kind = "continuous_assign"} : i42
+  %0 = moore.variable : <i42>
+  %1 = moore.read %0 : <i42>
+  dbg.variable "unnamed_var", %1 : !moore.i42
+}
+
+// CHECK-LABEL: moore.module @PreserveUnnamedSourceStatementNet
+moore.module @PreserveUnnamedSourceStatementNet(in %u: !moore.i42) {
+  // CHECK: moore.assign %[[NET:.+]], %u {pcov.src.statement_id = 0 : i32, pcov.src.statement_kind = "continuous_assign"} : i42
+  // CHECK: %[[NET]] = moore.net wire
+  // CHECK: moore.read %[[NET]]
+  moore.assign %0, %u {pcov.src.statement_id = 0 : i32, pcov.src.statement_kind = "continuous_assign"} : i42
+  %0 = moore.net wire : <i42>
+  %1 = moore.read %0 : <i42>
+  dbg.variable "unnamed_net", %1 : !moore.i42
+}
+
 // CHECK-LABEL: moore.module @PreserveCoverageEventVars
 moore.module @PreserveCoverageEventVars(in %u: !moore.i42) {
   // CHECK: %event = moore.variable {{.*}}pcov.coverage.event

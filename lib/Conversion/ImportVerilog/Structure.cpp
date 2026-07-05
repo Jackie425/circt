@@ -36,7 +36,6 @@ void Context::beginSourceRegionProcedure(moore::ProcedureOp procOp) {
   sourceRegions.push_back({0, std::nullopt, std::nullopt});
   currentSourceRegionId = 0;
   nextSourceRegionId = 1;
-  nextSourceBranchId = 0;
   sourceRegionSuspendDepth = 0;
   hasSourceRegionControl = false;
 }
@@ -72,7 +71,6 @@ void Context::finalizeSourceRegionProcedure() {
   sourceRegions.clear();
   currentSourceRegionId = 0;
   nextSourceRegionId = 0;
-  nextSourceBranchId = 0;
   sourceRegionSuspendDepth = 0;
   hasSourceRegionControl = false;
 }
@@ -82,7 +80,6 @@ void Context::discardSourceRegionProcedure() {
   sourceRegions.clear();
   currentSourceRegionId = 0;
   nextSourceRegionId = 0;
-  nextSourceBranchId = 0;
   sourceRegionSuspendDepth = 0;
   hasSourceRegionControl = false;
 }
@@ -96,6 +93,20 @@ void Context::resumeSourceRegionCollection() {
 
 bool Context::isCollectingSourceRegions() const {
   return currentSourceRegionProcedure && sourceRegionSuspendDepth == 0;
+}
+
+void Context::beginSourceBranchCollection() {
+  sourceBranchCollectionActive = true;
+  nextSourceBranchId = 0;
+}
+
+void Context::endSourceBranchCollection() {
+  sourceBranchCollectionActive = false;
+  nextSourceBranchId = 0;
+}
+
+bool Context::isCollectingSourceBranches() const {
+  return sourceBranchCollectionActive && sourceRegionSuspendDepth == 0;
 }
 
 void Context::annotateSourceControl(Operation *op) {
@@ -1098,6 +1109,8 @@ Context::convertModuleBody(const slang::ast::InstanceBodySymbol *module) {
 
   ValueSymbolScope scope(valueSymbols);
   resetSourceStatementIds();
+  beginSourceBranchCollection();
+  llvm::scope_exit sourceBranchGuard([&] { endSourceBranchCollection(); });
 
   // Keep track of the local time scale. `getTimeScale` automatically looks
   // through parent scopes to find the time scale effective locally.

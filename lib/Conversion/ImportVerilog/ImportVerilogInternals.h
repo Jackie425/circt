@@ -162,13 +162,19 @@ struct Context {
   void resumeSourceRegionCollection();
   /// Return whether source region collection is active for this statement.
   bool isCollectingSourceRegions() const;
+  /// Start collecting module-scoped source branch baseline metadata.
+  void beginSourceBranchCollection();
+  /// Stop collecting module-scoped source branch baseline metadata.
+  void endSourceBranchCollection();
+  /// Return whether source branch baseline metadata collection is active.
+  bool isCollectingSourceBranches() const;
   /// Annotate a lowered control-flow branch as belonging to the active region.
   void annotateSourceControl(Operation *op);
   /// Reset module-local source statement IDs.
   void resetSourceStatementIds();
   /// Annotate a lowered operation as a source statement baseline bin.
   void annotateSourceStatement(Operation *op, StringRef kind);
-  /// Allocate a source branch baseline site in the active procedure.
+  /// Allocate a module-local source branch baseline site.
   unsigned allocateSourceBranch();
   /// Annotate a lowered conditional branch with source branch alternatives.
   void annotateSourceBranch(Operation *op, unsigned branchId, StringRef kind,
@@ -391,6 +397,7 @@ struct Context {
   unsigned nextSourceBranchId = 0;
   unsigned nextSourceStatementId = 0;
   unsigned sourceRegionSuspendDepth = 0;
+  bool sourceBranchCollectionActive = false;
   bool hasSourceRegionControl = false;
 
 private:
