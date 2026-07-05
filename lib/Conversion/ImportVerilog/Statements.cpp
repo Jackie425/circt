@@ -335,6 +335,11 @@ struct StmtVisitor {
                                            falseBlock ? falseBlock
                                                       : &exitBlock);
     context.annotateSourceControl(branch);
+    if (context.isCollectingSourceRegions()) {
+      SmallVector<StringRef, 2> alternatives = {"true", "false"};
+      unsigned branchId = context.allocateSourceBranch();
+      context.annotateSourceBranch(branch, branchId, "if", alternatives, 0, 1);
+    }
 
     // Generate the true branch.
     builder.setInsertionPointToEnd(&trueBlock);
@@ -377,8 +382,24 @@ struct StmtVisitor {
     auto &exitBlock = createBlock();
     Block *lastMatchBlock = nullptr;
     SmallVector<moore::FVIntegerAttr> itemConsts;
+    std::optional<unsigned> sourceBranchId;
+    SmallVector<std::string, 4> sourceAlternativeStorage;
+    SmallVector<StringRef, 4> sourceAlternatives;
+    cf::CondBranchOp lastCaseConditionBranch;
+    if (context.isCollectingSourceRegions()) {
+      sourceBranchId = context.allocateSourceBranch();
+      sourceAlternativeStorage.reserve(caseStmt.items.size() + 1);
+      sourceAlternatives.reserve(caseStmt.items.size() + 1);
+      for (unsigned i = 0, e = caseStmt.items.size(); i != e; ++i) {
+        sourceAlternativeStorage.push_back(
+            (llvm::Twine("case_item_") + llvm::Twine(i)).str());
+        sourceAlternatives.push_back(sourceAlternativeStorage.back());
+      }
+      sourceAlternativeStorage.push_back("default");
+      sourceAlternatives.push_back(sourceAlternativeStorage.back());
+    }
 
-    for (const auto &item : caseStmt.items) {
+    for (auto [itemIndex, item] : llvm::enumerate(caseStmt.items)) {
       // Create the block that will contain the main body of the expression.
       // This is where any of the comparisons will branch to if they match.
       auto &matchBlock = createBlock();
@@ -429,6 +450,12 @@ struct StmtVisitor {
         auto branch = mlir::cf::CondBranchOp::create(builder, itemLoc, cond,
                                                      &matchBlock, &nextBlock);
         context.annotateSourceControl(branch);
+        if (sourceBranchId) {
+          context.annotateSourceBranch(branch, *sourceBranchId, "case",
+                                       sourceAlternatives, itemIndex,
+                                       std::nullopt);
+          lastCaseConditionBranch = branch;
+        }
         builder.setInsertionPointToEnd(&nextBlock);
       }
 
@@ -525,6 +552,12 @@ struct StmtVisitor {
            || caseStmt.condition == CaseStatementCondition::WildcardJustZ)) {
       mlir::cf::BranchOp::create(builder, loc, lastMatchBlock);
     } else {
+      if (lastCaseConditionBranch) {
+        unsigned defaultId = sourceAlternatives.size() - 1;
+        lastCaseConditionBranch->setAttr(
+            "pcov.src.false_alternative_id",
+            builder.getI32IntegerAttr(defaultId));
+      }
       // Generate the default case if present.
       if (caseStmt.defaultCase)
         if (failed(context.convertStatement(*caseStmt.defaultCase)))

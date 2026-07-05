@@ -164,6 +164,17 @@ struct Context {
   bool isCollectingSourceRegions() const;
   /// Annotate a lowered control-flow branch as belonging to the active region.
   void annotateSourceControl(Operation *op);
+  /// Reset module-local source statement IDs.
+  void resetSourceStatementIds();
+  /// Annotate a lowered operation as a source statement baseline bin.
+  void annotateSourceStatement(Operation *op, StringRef kind);
+  /// Allocate a source branch baseline site in the active procedure.
+  unsigned allocateSourceBranch();
+  /// Annotate a lowered conditional branch with source branch alternatives.
+  void annotateSourceBranch(Operation *op, unsigned branchId, StringRef kind,
+                            ArrayRef<StringRef> alternatives,
+                            std::optional<unsigned> trueAlternativeId,
+                            std::optional<unsigned> falseAlternativeId);
   /// Allocate an opaque node in the active source region.
   unsigned allocateSourceOpaque();
   /// Create a child source region for a folded opaque node.
@@ -377,6 +388,8 @@ struct Context {
   SmallVector<SourceRegionInfo> sourceRegions;
   unsigned currentSourceRegionId = 0;
   unsigned nextSourceRegionId = 0;
+  unsigned nextSourceBranchId = 0;
+  unsigned nextSourceStatementId = 0;
   unsigned sourceRegionSuspendDepth = 0;
   bool hasSourceRegionControl = false;
 

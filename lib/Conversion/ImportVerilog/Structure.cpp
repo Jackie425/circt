@@ -36,6 +36,7 @@ void Context::beginSourceRegionProcedure(moore::ProcedureOp procOp) {
   sourceRegions.push_back({0, std::nullopt, std::nullopt});
   currentSourceRegionId = 0;
   nextSourceRegionId = 1;
+  nextSourceBranchId = 0;
   sourceRegionSuspendDepth = 0;
   hasSourceRegionControl = false;
 }
@@ -71,6 +72,7 @@ void Context::finalizeSourceRegionProcedure() {
   sourceRegions.clear();
   currentSourceRegionId = 0;
   nextSourceRegionId = 0;
+  nextSourceBranchId = 0;
   sourceRegionSuspendDepth = 0;
   hasSourceRegionControl = false;
 }
@@ -80,6 +82,7 @@ void Context::discardSourceRegionProcedure() {
   sourceRegions.clear();
   currentSourceRegionId = 0;
   nextSourceRegionId = 0;
+  nextSourceBranchId = 0;
   sourceRegionSuspendDepth = 0;
   hasSourceRegionControl = false;
 }
@@ -111,6 +114,53 @@ void Context::annotateSourceControl(Operation *op) {
     op->setAttr("pcov.src.opaque_id",
                 builder.getI32IntegerAttr(*region->parentOpaqueId));
   hasSourceRegionControl = true;
+}
+
+void Context::resetSourceStatementIds() { nextSourceStatementId = 0; }
+
+void Context::annotateSourceStatement(Operation *op, StringRef kind) {
+  if (!op)
+    return;
+  op->setAttr("pcov.src.statement_id",
+              builder.getI32IntegerAttr(nextSourceStatementId++));
+  op->setAttr("pcov.src.statement_kind", builder.getStringAttr(kind));
+}
+
+unsigned Context::allocateSourceBranch() {
+  assert(isCollectingSourceRegions() &&
+         "source branch allocation requires an active source procedure");
+  return nextSourceBranchId++;
+}
+
+void Context::annotateSourceBranch(Operation *op, unsigned branchId,
+                                   StringRef kind,
+                                   ArrayRef<StringRef> alternatives,
+                                   std::optional<unsigned> trueAlternativeId,
+                                   std::optional<unsigned> falseAlternativeId) {
+  if (!isCollectingSourceRegions() || !op)
+    return;
+
+  SmallVector<Attribute> alternativeAttrs;
+  alternativeAttrs.reserve(alternatives.size());
+  auto *ctx = getContext();
+  for (auto [index, name] : llvm::enumerate(alternatives)) {
+    SmallVector<NamedAttribute> attrs;
+    attrs.push_back(
+        builder.getNamedAttr("id", builder.getI32IntegerAttr(index)));
+    attrs.push_back(builder.getNamedAttr("name", builder.getStringAttr(name)));
+    alternativeAttrs.push_back(DictionaryAttr::get(ctx, attrs));
+  }
+
+  op->setAttr("pcov.src.branch_id", builder.getI32IntegerAttr(branchId));
+  op->setAttr("pcov.src.branch_kind", builder.getStringAttr(kind));
+  op->setAttr("pcov.src.branch_alternatives",
+              builder.getArrayAttr(alternativeAttrs));
+  if (trueAlternativeId)
+    op->setAttr("pcov.src.true_alternative_id",
+                builder.getI32IntegerAttr(*trueAlternativeId));
+  if (falseAlternativeId)
+    op->setAttr("pcov.src.false_alternative_id",
+                builder.getI32IntegerAttr(*falseAlternativeId));
 }
 
 unsigned Context::allocateSourceOpaque() {
@@ -648,12 +698,15 @@ struct ModuleVisitor : public BaseVisitor {
           ctrl->expr, moore::TimeType::get(builder.getContext()));
       if (!delay)
         return failure();
-      moore::DelayedContinuousAssignOp::create(builder, loc, lhs, rhs, delay);
+      auto assign =
+          moore::DelayedContinuousAssignOp::create(builder, loc, lhs, rhs, delay);
+      context.annotateSourceStatement(assign, "continuous_assign");
       return success();
     }
 
     // Otherwise this is a regular assignment.
-    moore::ContinuousAssignOp::create(builder, loc, lhs, rhs);
+    auto assign = moore::ContinuousAssignOp::create(builder, loc, lhs, rhs);
+    context.annotateSourceStatement(assign, "continuous_assign");
     return success();
   }
 
@@ -1046,6 +1099,7 @@ Context::convertModuleBody(const slang::ast::InstanceBodySymbol *module) {
   builder.setInsertionPointToEnd(lowering.op.getBody());
 
   ValueSymbolScope scope(valueSymbols);
+  resetSourceStatementIds();
 
   // Keep track of the local time scale. `getTimeScale` automatically looks
   // through parent scopes to find the time scale effective locally.
