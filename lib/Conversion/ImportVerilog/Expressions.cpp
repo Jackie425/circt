@@ -1357,6 +1357,10 @@ struct RvalueExprVisitor : public ExprVisitor {
       return {};
     auto conditionalOp =
         moore::ConditionalOp::create(builder, loc, type, value);
+    SmallVector<StringRef, 2> alternatives = {"true", "false"};
+    unsigned branchId = context.allocateSourceBranch();
+    context.annotateSourceBranch(conditionalOp, branchId, "conditional",
+                                 alternatives, 0, 1);
 
     // Create blocks for true region and false region.
     auto &trueBlock = conditionalOp.getTrueRegion().emplaceBlock();

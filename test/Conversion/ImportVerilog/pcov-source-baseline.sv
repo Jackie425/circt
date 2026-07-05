@@ -41,3 +41,13 @@ module BranchCase(input logic [1:0] s, output logic y);
     endcase
   end
 endmodule
+
+// CHECK-LABEL: moore.module @BranchConditional
+module BranchConditional(input logic s, input logic a, input logic b, output logic y);
+  // CHECK: moore.conditional
+  // CHECK-SAME: pcov.src.branch_alternatives = [{id = 0 : i32, name = "true"}, {id = 1 : i32, name = "false"}]
+  // CHECK-SAME: pcov.src.branch_kind = "conditional"
+  // CHECK-SAME: pcov.src.false_alternative_id = 1
+  // CHECK-SAME: pcov.src.true_alternative_id = 0
+  assign y = s ? a : b;
+endmodule

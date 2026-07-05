@@ -256,6 +256,18 @@ void InstanceOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 // VariableOp
 //===----------------------------------------------------------------------===//
 
+static void copyPcovSourceAttrs(Operation *from, Operation *to) {
+  for (auto attr : from->getAttrs())
+    if (attr.getName().getValue().starts_with("pcov.src."))
+      to->setAttr(attr.getName(), attr.getValue());
+}
+
+static bool hasPcovCoverageAttrs(Operation *op) {
+  return llvm::any_of(op->getAttrs(), [](NamedAttribute attr) {
+    return attr.getName().getValue().starts_with("pcov.coverage.");
+  });
+}
+
 void VariableOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   if (getName() && !getName()->empty())
     setNameFn(getResult(), *getName());
@@ -273,6 +285,9 @@ LogicalResult VariableOp::canonicalize(VariableOp op,
     BlockingAssignOp::create(rewriter, initial.getLoc(), op, initial);
     return success();
   }
+
+  if (hasPcovCoverageAttrs(op))
+    return failure();
 
   // Check if the variable has one unique continuous assignment to it, all other
   // uses are reads, and that all uses are in the same block as the variable
@@ -302,9 +317,12 @@ LogicalResult VariableOp::canonicalize(VariableOp op,
   // If the original variable had a name, create an `AssignedVariableOp` as a
   // replacement. Otherwise substitute the assigned value directly.
   Value assignedValue = uniqueAssignOp.getSrc();
-  if (auto name = op.getNameAttr(); name && !name.empty())
-    assignedValue = AssignedVariableOp::create(rewriter, op.getLoc(), name,
-                                               uniqueAssignOp.getSrc());
+  if (auto name = op.getNameAttr(); name && !name.empty()) {
+    auto assignedVar = AssignedVariableOp::create(rewriter, op.getLoc(), name,
+                                                  uniqueAssignOp.getSrc());
+    copyPcovSourceAttrs(uniqueAssignOp, assignedVar);
+    assignedValue = assignedVar;
+  }
 
   // Remove the assign op and replace all reads with the new assigned var op.
   rewriter.eraseOp(uniqueAssignOp);
@@ -456,7 +474,10 @@ LogicalResult NetOp::canonicalize(NetOp op, PatternRewriter &rewriter) {
   // assigned value set, fold the assignment into the net.
   if (uniqueAssignOp && !op.getAssignment()) {
     rewriter.modifyOpInPlace(
-        op, [&] { op.getAssignmentMutable().assign(uniqueAssignOp.getSrc()); });
+        op, [&] {
+          op.getAssignmentMutable().assign(uniqueAssignOp.getSrc());
+          copyPcovSourceAttrs(uniqueAssignOp, op);
+        });
     rewriter.eraseOp(uniqueAssignOp);
     modified = true;
     uniqueAssignOp = {};
@@ -469,9 +490,12 @@ LogicalResult NetOp::canonicalize(NetOp op, PatternRewriter &rewriter) {
     // If the original net had a name, create an `AssignedVariableOp` as a
     // replacement. Otherwise substitute the assigned value directly.
     auto assignedValue = op.getAssignment();
-    if (auto name = op.getNameAttr(); name && !name.empty())
-      assignedValue = AssignedVariableOp::create(rewriter, op.getLoc(), name,
-                                                 assignedValue);
+    if (auto name = op.getNameAttr(); name && !name.empty()) {
+      auto assignedVar =
+          AssignedVariableOp::create(rewriter, op.getLoc(), name, assignedValue);
+      copyPcovSourceAttrs(op, assignedVar);
+      assignedValue = assignedVar;
+    }
 
     // Replace all reads with the new assigned var op and remove the original
     // net op.

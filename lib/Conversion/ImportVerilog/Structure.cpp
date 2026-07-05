@@ -127,8 +127,6 @@ void Context::annotateSourceStatement(Operation *op, StringRef kind) {
 }
 
 unsigned Context::allocateSourceBranch() {
-  assert(isCollectingSourceRegions() &&
-         "source branch allocation requires an active source procedure");
   return nextSourceBranchId++;
 }
 
@@ -137,7 +135,7 @@ void Context::annotateSourceBranch(Operation *op, unsigned branchId,
                                    ArrayRef<StringRef> alternatives,
                                    std::optional<unsigned> trueAlternativeId,
                                    std::optional<unsigned> falseAlternativeId) {
-  if (!isCollectingSourceRegions() || !op)
+  if (!op)
     return;
 
   SmallVector<Attribute> alternativeAttrs;

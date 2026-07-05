@@ -261,6 +261,26 @@ moore.module @OptimizeUniquelyAssignedVars(in %u: !moore.i42, in %v: !moore.i42,
   dbg.variable "e", %7 : !moore.i42
 }
 
+// CHECK-LABEL: moore.module @PreserveSourceStatementAttrs
+moore.module @PreserveSourceStatementAttrs(in %u: !moore.i42) {
+  // CHECK-NOT: moore.assign
+  // CHECK: %a = moore.assigned_variable %u {pcov.src.statement_id = 0 : i32, pcov.src.statement_kind = "continuous_assign"} : i42
+  moore.assign %a, %u {pcov.src.statement_id = 0 : i32, pcov.src.statement_kind = "continuous_assign"} : i42
+  %a = moore.variable : <i42>
+  %0 = moore.read %a : <i42>
+  dbg.variable "a", %0 : !moore.i42
+}
+
+// CHECK-LABEL: moore.module @PreserveCoverageEventVars
+moore.module @PreserveCoverageEventVars(in %u: !moore.i42) {
+  // CHECK: %event = moore.variable {{.*}}pcov.coverage.event
+  // CHECK: moore.assign %event, %u
+  %event = moore.variable {pcov.coverage.event, pcov.coverage.kind = "branch"} : <i42>
+  moore.assign %event, %u : i42
+  %0 = moore.read %event : <i42>
+  dbg.variable "event", %0 : !moore.i42
+}
+
 // CHECK-LABEL: moore.module @DontOptimizeVarsWithMultipleAssigns
 moore.module @DontOptimizeVarsWithMultipleAssigns() {
   %0 = moore.constant 1337 : i42
