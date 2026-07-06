@@ -1044,7 +1044,10 @@ void Promoter::constructLattice() {
 
     // Create the exit node for the block.
     auto *exit = lattice.createNode<BlockExit>(&block, valueBefore);
+    SmallPtrSet<Block *, 4> uniqueSuccessors;
     for (auto *otherBlock : exit->terminator->getSuccessors()) {
+      if (!uniqueSuccessors.insert(otherBlock).second)
+        continue;
       auto *otherEntry = blockEntries.lookup(otherBlock);
       exit->successors.push_back(otherEntry);
       otherEntry->predecessors.push_back(exit);
