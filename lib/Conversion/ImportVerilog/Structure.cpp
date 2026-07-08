@@ -109,6 +109,15 @@ bool Context::isCollectingSourceBranches() const {
   return sourceBranchCollectionActive && sourceRegionSuspendDepth == 0;
 }
 
+void Context::enterGenerateBlock() { ++sourceGenerateDepth; }
+
+void Context::exitGenerateBlock() {
+  assert(sourceGenerateDepth && "source generate depth not active");
+  --sourceGenerateDepth;
+}
+
+bool Context::isInsideGenerateBlock() const { return sourceGenerateDepth != 0; }
+
 void Context::annotateSourceControl(Operation *op) {
   if (!isCollectingSourceRegions() || !op)
     return;
@@ -763,6 +772,8 @@ struct ModuleVisitor : public BaseVisitor {
     // Ignore uninstantiated blocks.
     if (genNode.isUninstantiated)
       return success();
+    context.enterGenerateBlock();
+    llvm::scope_exit generateGuard([&] { context.exitGenerateBlock(); });
 
     // If the block has a name, add it to the list of block name prefices.
     SmallString<64> prefix = blockNamePrefix;

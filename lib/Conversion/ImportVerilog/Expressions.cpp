@@ -157,6 +157,11 @@ static Value visitClassProperty(Context &context,
 }
 
 namespace {
+static bool isConstantExpression(Context &context,
+                                 const slang::ast::Expression &expr) {
+  return static_cast<bool>(context.evaluateConstant(expr));
+}
+
 /// A visitor handling expressions that can be lowered as lvalue and rvalue.
 struct ExprVisitor {
   Context &context;
@@ -1357,7 +1362,9 @@ struct RvalueExprVisitor : public ExprVisitor {
       return {};
     auto conditionalOp =
         moore::ConditionalOp::create(builder, loc, type, value);
-    if (context.isCollectingSourceBranches()) {
+    if (context.isCollectingSourceBranches() &&
+        !context.isInsideGenerateBlock() &&
+        !isConstantExpression(context, *cond.expr)) {
       SmallVector<StringRef, 2> alternatives = {"true", "false"};
       unsigned branchId = context.allocateSourceBranch();
       context.annotateSourceBranch(conditionalOp, branchId, "conditional",

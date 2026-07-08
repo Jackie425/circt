@@ -168,6 +168,9 @@ struct Context {
   void endSourceBranchCollection();
   /// Return whether source branch baseline metadata collection is active.
   bool isCollectingSourceBranches() const;
+  void enterGenerateBlock();
+  void exitGenerateBlock();
+  bool isInsideGenerateBlock() const;
   /// Annotate a lowered control-flow branch as belonging to the active region.
   void annotateSourceControl(Operation *op);
   /// Reset module-local source statement IDs.
@@ -397,6 +400,7 @@ struct Context {
   unsigned nextSourceBranchId = 0;
   unsigned nextSourceStatementId = 0;
   unsigned sourceRegionSuspendDepth = 0;
+  unsigned sourceGenerateDepth = 0;
   bool sourceBranchCollectionActive = false;
   bool hasSourceRegionControl = false;
 
