@@ -575,6 +575,55 @@ static bool isMovableDeclaration(Operation *op) {
   });
 }
 
+static void lowerReadInOutToTemporaryWireAfter(Operation *anchor,
+                                               ReadInOutOp read) {
+  Block *block = anchor->getBlock();
+  ImplicitLocOpBuilder builder(read.getLoc(), block, block->begin());
+  auto temp =
+      sv::WireOp::create(builder, read.getResult().getType(),
+                         inferStructuralNameForTemporary(read.getResult()));
+
+  while (!read.getResult().use_empty()) {
+    OpOperand &use = *read.getResult().getUses().begin();
+    auto tempRead = ReadInOutOp::create(builder, temp);
+    use.set(tempRead);
+    tempRead->moveBefore(use.getOwner());
+  }
+
+  builder.setInsertionPointAfter(anchor);
+  auto sourceRead = ReadInOutOp::create(builder, read.getInput());
+  AssignOp::create(builder, temp, sourceRead);
+  read.erase();
+}
+
+static bool lowerOutOfOrderReadUsers(Operation *op, Block &block,
+                                     const SmallPtrSetImpl<Operation *>
+                                         &seenOperations) {
+  if (!isa<RegOp>(op))
+    return false;
+
+  SmallVector<ReadInOutOp> reads;
+  for (auto &use : op->getUses()) {
+    auto *userOp = use.getOwner();
+    while (&block != &userOp->getParentRegion()->front())
+      userOp = userOp->getParentOp();
+    if (!seenOperations.count(userOp))
+      continue;
+
+    auto read = dyn_cast<ReadInOutOp>(use.getOwner());
+    if (!read || read.getInput() != op->getResult(0))
+      return false;
+    reads.push_back(read);
+  }
+
+  if (reads.empty())
+    return false;
+
+  for (auto read : reads)
+    lowerReadInOutToTemporaryWireAfter(op, read);
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 // EmittedExpressionStateManager
 //===----------------------------------------------------------------------===//
@@ -1350,6 +1399,9 @@ static LogicalResult legalizeHWModule(Block &block,
         continue;
       }
     }
+
+    if (lowerOutOfOrderReadUsers(&op, block, seenOperations))
+      continue;
 
     // Otherwise, we need to lower this to a wire to resolve this.
     lowerUsersToTemporaryWire(op,

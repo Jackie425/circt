@@ -254,6 +254,27 @@ module attributes { circt.loweringOptions = "disallowPackedStructAssignments"} {
 }
 
 // -----
+
+!Q = !hw.struct<a: i1>
+!O = !hw.struct<q: !Q>
+module attributes {circt.loweringOptions = "disallowPackedStructAssignments"} {
+  // CHECK-LABEL: hw.module @preserve_aggregate_reg_assignment_target
+  hw.module @preserve_aggregate_reg_assignment_target(in %clk: i1, in %next: !Q, out out: !O) {
+    %false = hw.constant false
+    %init = hw.bitcast %false : (i1) -> !Q
+    %q_read = sv.read_inout %q : !hw.inout<struct<a: i1>>
+    %out = hw.struct_create (%q_read) : !O
+    // CHECK: %q = sv.reg
+    %q = sv.reg init %init : !hw.inout<struct<a: i1>>
+    sv.always posedge %clk {
+      // CHECK: sv.bpassign %q,
+      sv.bpassign %q, %next : !Q
+    }
+    hw.output %out : !O
+  }
+}
+
+// -----
 // LTL expressions that are used before being defined should not be spilled to
 // wires, where they crash the PrepareForEmission pass. They are always emitted
 // inline, so no need to restructure the IR.
