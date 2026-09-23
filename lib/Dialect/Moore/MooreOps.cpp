@@ -270,7 +270,8 @@ static bool hasPcovSourceAttrs(Operation *op) {
 
 static bool hasPcovCoverageAttrs(Operation *op) {
   return llvm::any_of(op->getAttrs(), [](NamedAttribute attr) {
-    return attr.getName().getValue().starts_with("pcov.coverage.");
+    StringRef name = attr.getName().getValue();
+    return name.starts_with("pcov.code.");
   });
 }
 

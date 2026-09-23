@@ -295,9 +295,9 @@ moore.module @PreserveUnnamedSourceStatementNet(in %u: !moore.i42) {
 
 // CHECK-LABEL: moore.module @PreserveCoverageEventVars
 moore.module @PreserveCoverageEventVars(in %u: !moore.i42) {
-  // CHECK: %event = moore.variable {{.*}}pcov.coverage.event
+  // CHECK: %event = moore.variable {{.*}}pcov.code.event
   // CHECK: moore.assign %event, %u
-  %event = moore.variable {pcov.coverage.event, pcov.coverage.kind = "branch"} : <i42>
+  %event = moore.variable {pcov.code.event, pcov.code.kind = "branch"} : <i42>
   moore.assign %event, %u : i42
   %0 = moore.read %event : <i42>
   dbg.variable "event", %0 : !moore.i42

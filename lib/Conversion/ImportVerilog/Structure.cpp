@@ -37,7 +37,7 @@ void Context::beginSourceRegionProcedure(moore::ProcedureOp procOp) {
   currentSourceRegionId = 0;
   nextSourceRegionId = 1;
   sourceRegionSuspendDepth = 0;
-  hasSourceRegionControl = false;
+  hasSourceRegionBranch = false;
 }
 
 void Context::finalizeSourceRegionProcedure() {
@@ -45,7 +45,7 @@ void Context::finalizeSourceRegionProcedure() {
     return;
 
   bool hasRootOnlyRegion = sourceRegions.size() == 1;
-  if (hasSourceRegionControl || hasRootOnlyRegion) {
+  if (hasSourceRegionBranch || hasRootOnlyRegion) {
     SmallVector<Attribute> regionAttrs;
     regionAttrs.reserve(sourceRegions.size());
     auto *ctx = getContext();
@@ -72,7 +72,7 @@ void Context::finalizeSourceRegionProcedure() {
   currentSourceRegionId = 0;
   nextSourceRegionId = 0;
   sourceRegionSuspendDepth = 0;
-  hasSourceRegionControl = false;
+  hasSourceRegionBranch = false;
 }
 
 void Context::discardSourceRegionProcedure() {
@@ -81,7 +81,7 @@ void Context::discardSourceRegionProcedure() {
   currentSourceRegionId = 0;
   nextSourceRegionId = 0;
   sourceRegionSuspendDepth = 0;
-  hasSourceRegionControl = false;
+  hasSourceRegionBranch = false;
 }
 
 void Context::suspendSourceRegionCollection() { ++sourceRegionSuspendDepth; }
@@ -118,7 +118,7 @@ void Context::exitGenerateBlock() {
 
 bool Context::isInsideGenerateBlock() const { return sourceGenerateDepth != 0; }
 
-void Context::annotateSourceControl(Operation *op) {
+void Context::annotateSourceRegionBranch(Operation *op) {
   if (!isCollectingSourceRegions() || !op)
     return;
   auto region = llvm::find_if(sourceRegions, [&](const SourceRegionInfo &info) {
@@ -128,12 +128,10 @@ void Context::annotateSourceControl(Operation *op) {
     return;
   op->setAttr("pcov.src.region_id",
               builder.getI32IntegerAttr(currentSourceRegionId));
-  op->setAttr("pcov.src.control_id",
-              builder.getI32IntegerAttr(region->nextControlId++));
   if (region->parentOpaqueId)
     op->setAttr("pcov.src.opaque_id",
                 builder.getI32IntegerAttr(*region->parentOpaqueId));
-  hasSourceRegionControl = true;
+  hasSourceRegionBranch = true;
 }
 
 void Context::resetSourceStatementIds() { nextSourceStatementId = 0; }

@@ -334,7 +334,7 @@ struct StmtVisitor {
     auto branch = cf::CondBranchOp::create(builder, loc, allConds, &trueBlock,
                                            falseBlock ? falseBlock
                                                       : &exitBlock);
-    context.annotateSourceControl(branch);
+    context.annotateSourceRegionBranch(branch);
     if (context.isCollectingSourceRegions()) {
       SmallVector<StringRef, 2> alternatives = {"true", "false"};
       unsigned branchId = context.allocateSourceBranch();
@@ -449,7 +449,7 @@ struct StmtVisitor {
         auto &nextBlock = createBlock();
         auto branch = mlir::cf::CondBranchOp::create(builder, itemLoc, cond,
                                                      &matchBlock, &nextBlock);
-        context.annotateSourceControl(branch);
+        context.annotateSourceRegionBranch(branch);
         if (sourceBranchId) {
           context.annotateSourceBranch(branch, *sourceBranchId, "case",
                                        sourceAlternatives, itemIndex,

@@ -61,19 +61,21 @@ endmodule
 function void foo();
 endfunction
 
-// CHECK-LABEL: moore.module @SourceRegionNoControl()
-module SourceRegionNoControl;
+// CHECK-LABEL: moore.module @SourceRegionNoBranch()
+module SourceRegionNoBranch;
   logic a, b;
   // CHECK: moore.procedure initial attributes {pcov.src.regions = [{id = 0 : i32}]} {
   // CHECK: moore.return
   initial b = a;
 endmodule
 
-// CHECK-LABEL: moore.module @SourceRegionIfControl()
-module SourceRegionIfControl;
+// CHECK-LABEL: moore.module @SourceRegionIf()
+module SourceRegionIf;
   logic a, b;
   // CHECK: moore.procedure initial attributes {pcov.src.regions =
-  // CHECK: cf.cond_br {{.*}} {pcov.src.control_id = 0 : i32, pcov.src.region_id = 0 : i32}
+  // CHECK: cf.cond_br
+  // CHECK-SAME: pcov.src.branch_id = 0 : i32
+  // CHECK-SAME: pcov.src.region_id = 0 : i32
   initial if (a) b = 1; else b = 0;
 endmodule
 

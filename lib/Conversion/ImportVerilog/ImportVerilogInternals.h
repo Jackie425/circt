@@ -89,7 +89,6 @@ struct SourceRegionInfo {
   unsigned id = 0;
   std::optional<unsigned> parentRegionId;
   std::optional<unsigned> parentOpaqueId;
-  unsigned nextControlId = 0;
   unsigned nextOpaqueId = 0;
 };
 
@@ -171,8 +170,8 @@ struct Context {
   void enterGenerateBlock();
   void exitGenerateBlock();
   bool isInsideGenerateBlock() const;
-  /// Annotate a lowered control-flow branch as belonging to the active region.
-  void annotateSourceControl(Operation *op);
+  /// Annotate a lowered branch as belonging to the active path region.
+  void annotateSourceRegionBranch(Operation *op);
   /// Reset module-local source statement IDs.
   void resetSourceStatementIds();
   /// Annotate a lowered operation as a source statement baseline bin.
@@ -402,7 +401,7 @@ struct Context {
   unsigned sourceRegionSuspendDepth = 0;
   unsigned sourceGenerateDepth = 0;
   bool sourceBranchCollectionActive = false;
-  bool hasSourceRegionControl = false;
+  bool hasSourceRegionBranch = false;
 
 private:
   /// Helper function to extract the commonalities in lowering of functions and
