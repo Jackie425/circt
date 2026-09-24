@@ -56,6 +56,9 @@ struct ImportVerilogOptions {
   /// Interpret `always @(*)` as `always_comb`.
   bool lowerAlwaysAtStarAsComb = true;
 
+  /// Collect source-structured regions for path coverage.
+  bool collectSourceRegions = true;
+
   //===--------------------------------------------------------------------===//
   // Include paths
   //===--------------------------------------------------------------------===//

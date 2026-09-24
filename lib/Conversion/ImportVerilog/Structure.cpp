@@ -31,6 +31,8 @@ static void guessNamespacePrefix(const slang::ast::Symbol &symbol,
 }
 
 void Context::beginSourceRegionProcedure(moore::ProcedureOp procOp) {
+  if (!options.collectSourceRegions)
+    return;
   currentSourceRegionProcedure = procOp;
   sourceRegions.clear();
   sourceRegions.push_back({0, std::nullopt, std::nullopt});

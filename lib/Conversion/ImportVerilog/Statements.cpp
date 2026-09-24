@@ -335,7 +335,7 @@ struct StmtVisitor {
                                            falseBlock ? falseBlock
                                                       : &exitBlock);
     context.annotateSourceRegionBranch(branch);
-    if (context.isCollectingSourceRegions()) {
+    if (context.isCollectingSourceBranches()) {
       SmallVector<StringRef, 2> alternatives = {"true", "false"};
       unsigned branchId = context.allocateSourceBranch();
       context.annotateSourceBranch(branch, branchId, "if", alternatives, 0, 1);
@@ -386,7 +386,7 @@ struct StmtVisitor {
     SmallVector<std::string, 4> sourceAlternativeStorage;
     SmallVector<StringRef, 4> sourceAlternatives;
     cf::CondBranchOp lastCaseConditionBranch;
-    if (context.isCollectingSourceRegions()) {
+    if (context.isCollectingSourceBranches()) {
       sourceBranchId = context.allocateSourceBranch();
       sourceAlternativeStorage.reserve(caseStmt.items.size() + 1);
       sourceAlternatives.reserve(caseStmt.items.size() + 1);
